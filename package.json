@@ -23,7 +23,7 @@
     "prismarine-chat": "^1.10.0"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
+    "@types/node": "^20.19.43",
     "tsx": "^4.16.0",
     "typescript": "^5.5.0"
   }
