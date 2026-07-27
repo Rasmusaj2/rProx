@@ -17,6 +17,8 @@ export class HttpClient {
     private inflightRequests = new Map<string, Promise<unknown>>();
     private log: Logger;
 
+    private readonly userAgent =  "rProx/1.0";
+
     constructor(
         log?: Logger
     ) {
@@ -76,4 +78,78 @@ export class HttpClient {
             clearTimeout(timeout);
         }
     }
+
+    async send<T = unknown>(
+        url: string, 
+        method: "GET" | "POST" | "PUT" | "DELETE",  
+        options: {
+            headers?: Record<string, string>;
+            json?: unknown;
+            form?: Record<string, string>;
+            timeout?: number;
+        } = {}): Promise<{ ok: boolean, status: number, data: T | null }> 
+    {
+        const controller = new AbortController();
+        const timeout = options.timeout ?? 5000;
+        try {
+            const headers: Record<string, string> = {
+                "user-agent": this.userAgent,
+                accept: "application/json",
+                ...options.headers
+            };
+            let body: string | undefined;
+            
+            if (options.json !== undefined) {
+                headers["content-type"] = "application/json";
+                body = JSON.stringify(options.json);
+            } else if (options.form !== undefined) {
+                headers["content-type"] = "application/x-www-form-urlencoded";
+                body = new URLSearchParams(options.form).toString();
+            }
+            const result = await fetch(url, {
+                method,
+                headers,
+                body,
+                signal: controller.signal
+            });
+            const data = await result.json() as T;
+            return { ok: result.ok, status: result.status, data };
+        } catch (error) {
+            this.log.error(`HTTP ${method} ${url} failed: ${error}`);
+            return { ok: false, status: 0, data: null };
+        }
+        finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    // fetch json with caching and inflight request deduplication
+    async getJson<T = unknown>(url: string, options: HttpGet = {}): Promise<T | null> {
+    const key = options.cacheKey ?? url;
+    const ttl = options.cacheDuration ?? 0;
+
+    if (ttl > 0) {
+      const hit = this.cache.get(key);
+      if (hit && hit.expires > Date.now()) return hit.value as T;
+    }
+
+    const existing = this.inflightRequests.get(key);
+    if (existing) return existing as Promise<T | null>;
+
+    const p = this.fetch<T>(url, options)
+      .then((value) => {
+        if (ttl > 0 && value !== null) {
+          this.cache.set(key, { value, expires: Date.now() + ttl });
+        }
+        return value;
+      })
+      .finally(() => this.inflightRequests.delete(key));
+
+    this.inflightRequests.set(key, p as Promise<unknown>);
+    return p;
+  }
+
+  invalidate(...keys: string[]): void {
+    for (const k of keys) this.cache.delete(k);
+  }
 }
