@@ -20,9 +20,9 @@ function timestamp(): string {
   return new Date().toISOString().slice(11, 19);
 }
 
-export function createLogger(): Logger {
+export function createLogger(scope: string = "default"): Logger {
     const emit = (level: LogLevel, message: string, ...args: any[]) => {
-        const logMessage = `[${timestamp()}] [${level.toUpperCase()}] ${message}`;
+        const logMessage = `[${timestamp()}] [${level.toUpperCase()}] (${scope}) ${message}`;
         const type = level === "error" ? console.error : console.log;
         type(logMessage, ...args);
     }
