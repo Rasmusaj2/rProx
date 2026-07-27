@@ -1,1 +1,22 @@
-{}
+{
+    "proxy": {
+        "listenHost": "localhost",
+        "listenPort": 25565,
+        "targetHost": "mc.hypixel.net",
+        "targetPort": 25565,
+        "version": "1.8.9",
+        "motd": "\u00a7brProx \u00a72| \u00a76Hypixel Stats Proxy.",
+        "onlineMode": true,
+        "maxPlayers": 10
+    },
+    "auth": {
+        "dir": "./auth",
+        "requireMatchingAccount": true
+    },
+    "detection": {
+        "autoWhoOnStart": true,
+        "ignoreSelf": false
+    },
+    "builtInPlugins": {},
+    "pluginDirectory": "./plugins"
+}
