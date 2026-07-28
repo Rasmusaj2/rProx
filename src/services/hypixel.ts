@@ -17,6 +17,7 @@ export interface HypixelPlayer {
         UHC?: Record<string, any>;
         TNTGames?: Record<string, any>;
         MurderMystery?: Record<string, any>;
+        MainLobby?: Record<string, any>; // fishing lives in here, there is no stats.Fishing
     }
 }
 
@@ -275,5 +276,90 @@ export function duelsStats(player: HypixelPlayer): DuelsStats {
         kdr: ratio(duels.kills ?? 0, duels.deaths ?? 0),
         winstreak: duels.winstreak ?? 0,
         gamemodes,
+    }
+}
+
+
+
+/* 
+    NOTES ABOUT (missing mostly) FISHING STUFF:
+    1) Creatures (idk what this is) are not included, neither in the Total catches
+    2) Can add fishing rod stats
+    3) Orb weights
+    4) events
+    5) specific special fish caught
+    6) fireproofing + ice fishing nereid
+
+    WHO CARES. all of this can be done later
+*/
+
+export interface FishingStats {
+    totalCatches: number,
+    fishCaught: number,
+    treasureCaught: number,
+    junkCaught: number,
+    plantsCaught: number,
+    mythicalCaught: number,
+    specialCaught: number
+    areas: Record<string, AreaFishingStats>
+}
+
+export interface AreaFishingStats {
+    totalCatches: number,
+    fishCaught: number,
+    treasureCaught: number,
+    junkCaught: number,
+    plantsCaught: number
+}
+
+// lobby fishing is cancer because its stored so far down in the stats tree
+// its stored under stats.MainLobby.fishing.stats.permanent, and the permanent object has a key for each area
+// this also stores stats for each season, but we can implement that later
+const FISHING_AREAS = ["water", "lava", "ice"] as const;
+
+export function fishingStats(player: HypixelPlayer): FishingStats | null {
+    const fishing = player.stats?.MainLobby?.fishing;
+    if (!fishing) return null;
+    const permanent = fishing.stats?.permanent ?? {};
+
+    const areas: Record<string, AreaFishingStats> = {};
+    for (const name of FISHING_AREAS) {
+        const raw = permanent[name] ?? {};
+        const area: AreaFishingStats = {
+            fishCaught: raw.fish ?? 0,
+            treasureCaught: raw.treasure ?? 0,
+            junkCaught: raw.junk ?? 0,
+            plantsCaught: raw.plant ?? 0,
+            totalCatches: 0,
+        };
+        area.totalCatches = area.fishCaught + area.treasureCaught + area.junkCaught + area.plantsCaught;
+        if (area.totalCatches > 0) areas[name] = area;
+    }
+
+    const sum = (pick: (area: AreaFishingStats) => number) =>
+        Object.values(areas).reduce((total, area) => total + pick(area), 0);
+
+    // hypixel exposes no mythical counter, also its still called orbs
+    // we (should) loop over but this is fine for now i cant be btohered
+    let mythical = 
+    (fishing.orbs?.helios ?? 0) + 
+    (fishing.orbs?.selene ?? 0) + 
+    (fishing.orbs?.nyx ?? 0) + 
+    (fishing.orbs?.zeus ?? 0) + 
+    (fishing.orbs?.demeter ?? 0) +
+    (fishing.orbs?.aphrodite ?? 0) +
+    (fishing.orbs?.hades ?? 0) +
+    (fishing.orbs?.archimedes ?? 0);
+    
+
+    return {
+        totalCatches: sum((a) => a.totalCatches) + mythical,
+        fishCaught: sum((a) => a.fishCaught),
+        treasureCaught: sum((a) => a.treasureCaught),
+        junkCaught: sum((a) => a.junkCaught),
+        plantsCaught: sum((a) => a.plantsCaught),
+        mythicalCaught: mythical,
+        specialCaught: Object.keys(fishing.special_fish ?? {}).length,
+        areas,
     }
 }

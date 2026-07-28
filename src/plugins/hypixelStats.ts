@@ -8,6 +8,7 @@ import {
     uhcStats,
     tntGamesStats,
     murderMysteryStats,
+    fishingStats,
     fetchErrorMessage,
     type HypixelPlayer,
 } from "../services/hypixel";
@@ -17,6 +18,7 @@ import * as duels from "../services/duels";
 import * as uhc from "../services/uhc";
 import * as tnt from "../services/tntgames";
 import * as mm from "../services/murdermystery";
+import * as fish from "../services/fishing";
 import { formatRankedName } from "../services/rank";
 import { resolveUuid } from "../services/microsoft";
 import { COLOR_CODES, type McColorName } from "../util/mcColors";
@@ -34,7 +36,7 @@ const c = (color: McColorName, value: string | number) => COLOR_CODES[color] + v
 
 export const hypixelStatsPlugin: Plugin = {
     name: "hypixelStats",
-    version: "0.1.1",
+    version: "0.1.2",
     description: "Bedwars, SkyWars and Duels stats from the Hypixel API.",
     setup(api) {
         const config = api.pluginConfig as HypixelStatsConfig;
@@ -160,12 +162,37 @@ export const hypixelStatsPlugin: Plugin = {
             ];
         };
 
+        const fishingTags = (player: HypixelPlayer): Tag[] => {
+            const s = fishingStats(player);
+            if (!s || s.totalCatches === 0) return [];
+            const areas = Object.entries(s.areas)
+                .map(([name, a]) => `§7${name[0].toUpperCase()}${name.slice(1)}: ${c("white", a.fishCaught.toLocaleString())}`)
+                .join("   ");
+            const tooltip = [
+                `§7Fishing ${fish.formatMythical(s.mythicalCaught)} §8(${s.totalCatches.toLocaleString()} catches)`,
+                `§7Fish: ${c("white", s.fishCaught.toLocaleString())}   §7Treasure: ${c("white", s.treasureCaught.toLocaleString())}   §7Junk: ${c("white", s.junkCaught.toLocaleString())}`,
+                areas,
+                `§7Special: ${c("white", s.specialCaught)}   §7Plants: ${c("white", s.plantsCaught)}`,
+                "§8via Hypixel API",
+            ].join("\n");
+            return [
+                { text: fish.mythicalText(s.mythicalCaught), short: fish.mythicalText(s.mythicalCaught), formatted: fish.formatMythical(s.mythicalCaught), color: fish.mythicalColor(s.mythicalCaught), prefix: true, tooltip, priority: 20, game: "lobby" },
+                { text: fish.catchesText(s.totalCatches), short: fish.catchesText(s.totalCatches), formatted: fish.formatCatches(s.totalCatches), color: fish.catchesColor(s.totalCatches), tooltip, priority: 10, game: "lobby" },
+            ];
+        };
+
         api.registerEnricher({
             name: "hypixelStats",
             async enrich(player) {
                 const result = await fetch(player);
                 if (result.status !== "ok") return null;
-                return [...bedwarsTags(result.player), ...skywarsTags(result.player), ...duelsTags(result.player), ...uhcTags(result.player), ...tntgamesTags(result.player), ...murdermysteryTags(result.player)];
+                return [...bedwarsTags(result.player), 
+                    ...skywarsTags(result.player), 
+                    ...duelsTags(result.player), 
+                    ...uhcTags(result.player), 
+                    ...tntgamesTags(result.player), 
+                    ...murdermysteryTags(result.player),
+                    ...fishingTags(result.player),];
             },
         });
 
@@ -247,13 +274,14 @@ export const hypixelStatsPlugin: Plugin = {
             async (args, session) => {
                 const found = await resolve(args, session);
                 if (!found) return;
-                const s = uhcTags(found.player);
+                const s = uhcStats(found.player);
                 session.chat.text(`${PREFIX} ${found.title} §7- §bUHC`);
-                if (s.length === 0) {
+                if (s.wins === 0 && s.kills === 0) {
                     session.chat.text(`  §7No UHC stats`);
                     return;
                 }
-                session.chat.text(`  §7Wins: ${s[0].formatted}  §7WLR: ${s[1].formatted}  §7KDR: ${s[2].formatted}`);
+                session.chat.text(`  §7Wins: ${uhc.formatWins(s.wins)}  §7KDR: ${uhc.formatKdr(s.kdr)}  §7Score: ${c("white", s.score)}`);
+                session.chat.text(`  §7Kills: ${c("white", s.kills)}  §7Deaths: ${c("white", s.deaths)}  §7Heads eaten: ${c("white", s.headsEaten)}`);
             },
             "UHC stats for a player (or yourself)",
         );
@@ -262,13 +290,17 @@ export const hypixelStatsPlugin: Plugin = {
             async (args, session) => {
                 const found = await resolve(args, session);
                 if (!found) return;
-                const s = tntgamesTags(found.player);
+                const s = tntGamesStats(found.player);
                 session.chat.text(`${PREFIX} ${found.title} §7- §bTNT Games`);
-                if (s.length === 0) {
+                if (s.wins === 0) {
                     session.chat.text(`  §7No TNT Games stats`);
                     return;
                 }
-                session.chat.text(`  §7Wins: ${s[0].formatted}  §7WLR: ${s[1].formatted}`);
+                // no losses are reported anywhere in tnt, so this breaks the wins
+                // down per mode instead of showing a ratio it cannot work out
+                session.chat.text(`  §7Wins: ${tnt.formatWins(s.wins)}  §7Winstreak: ${c("white", s.winstreak)}`);
+                session.chat.text(`  §7TNT Run: ${tnt.formatTntRun(s.tntRun)}  §7PvP Run: ${c("white", s.pvpRun)}  §7Bow Spleef: ${c("white", s.bowSpleef)}`);
+                session.chat.text(`  §7TNT Tag: ${c("white", s.tntTag)}  §7Wizards: ${c("white", s.wizards)}`);
             },
             "TNT Games stats for a player (or yourself)",
         );
@@ -277,13 +309,36 @@ export const hypixelStatsPlugin: Plugin = {
             async (args, session) => {
                 const found = await resolve(args, session);
                 if (!found) return;
-                const s = murdermysteryTags(found.player);
+                const s = murderMysteryStats(found.player);
                 session.chat.text(`${PREFIX} ${found.title} §7- §bMurder Mystery`);
-                if (s.length === 0) {
+                if (s.wins === 0 && s.games === 0) {
                     session.chat.text(`  §7No Murder Mystery stats`);
                     return;
                 }
-            }
+                session.chat.text(`  §7Wins: ${mm.formatWins(s.wins)}  §7WLR: ${mm.formatWlr(s.wlr)}  §7KDR: ${c("white", s.kdr)}`);
+                session.chat.text(`  §7Games: ${c("white", s.games)}  §7As murderer: ${c("white", s.murdererWins)}  §7As detective: ${c("white", s.detectiveWins)}`);
+            },
+            "Murder Mystery stats for a player (or yourself)",
+        );
+        api.registerCommand(
+            "fish",
+            async (args, session) => {
+                const found = await resolve(args, session);
+                if (!found) return;
+                const s = fishingStats(found.player);
+                session.chat.text(`${PREFIX} ${found.title} §7- §bLobby Fishing`);
+                if (!s || s.totalCatches === 0) {
+                    session.chat.text(`  §7No Lobby Fishing stats`);
+                    return;
+                }
+                session.chat.text(`  §7Mythical: ${fish.formatMythical(s.mythicalCaught)}  §7Catches: ${fish.formatCatches(s.totalCatches)}  §7Special: ${c("white", s.specialCaught)}`);
+                session.chat.text(`  §7Fish: ${c("white", s.fishCaught.toLocaleString())}  §7Treasure: ${c("white", s.treasureCaught.toLocaleString())}  §7Junk: ${c("white", s.junkCaught.toLocaleString())}`);
+                const areas = Object.entries(s.areas)
+                    .map(([name, a]) => `§7${name[0].toUpperCase()}${name.slice(1)}: ${c("white", a.fishCaught.toLocaleString())}`)
+                    .join("  ");
+                if (areas) session.chat.text(`  ${areas}`);
+            },
+            "Lobby Fishing stats for a player (or yourself)",
         );
     },
 };
