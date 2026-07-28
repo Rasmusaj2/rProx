@@ -345,7 +345,6 @@ export const hypixelStatsPlugin: Plugin = {
                         `  §7plants: ${c("white", a.plantsCaught.toLocaleString())}` +
                         `  §7creatures: ${c("white", a.creaturesCaught.toLocaleString())}`,
                     );
-                    session.chat.text(``)
                 }
 
                 // orbs (mythical) weights + amount + fancy name and coloring correctly for high weight rolls
