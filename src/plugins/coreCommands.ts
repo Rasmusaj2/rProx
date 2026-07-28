@@ -16,24 +16,6 @@ export function createCoreCommandsPlugin(
         description: "//help, //who, //sc and //plugins",
         setup(api) {
             api.registerCommand(
-                "sc",
-                async (args, session) => {
-                    if (args[0]) {
-                        const name = args[0];
-                        session.chat.text(`${PREFIX} §7Checking §f${name}§7...`);
-                        await enrichment.checkPlayer(session.findPlayer(name) ?? { name }, "MANUAL", session, {
-                            always: true,
-                        });
-                        return;
-                    }
-                    const players = session.players();
-                    session.chat.text(`${PREFIX} §7Checking §f${players.length} §7players...`);
-                    await enrichment.checkPlayers(players, "MANUAL", session);
-                },
-                "stat check a player, or the whole lobby if no name is given",
-            );
-
-            api.registerCommand(
                 "who",
                 (_args, session) => {
                     session.sendUpstream("/who");
