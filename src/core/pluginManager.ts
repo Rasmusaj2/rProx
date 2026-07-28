@@ -55,7 +55,9 @@ export class PluginManager {
 
     // a plugin is on unless its config block says enabled: false
     async register(plugin: Plugin): Promise<void> {
-        if (this.pluginConfig(plugin.name).enabled === false) {
+        if (this.pluginConfig(plugin.name).enabled === false) { // yes this does mean you can disable external plugins in the config.json file
+            // i should probably make a seperate config thing for external plugins, but honestly i dont care enough and they should implement it themselves for now
+            // untill i get around to making a "externalPlugins" config area in the config.json file which external plugins can have a default config written to
             log.info(`skipping disabled plugin "${plugin.name}"`);
             return;
         }
