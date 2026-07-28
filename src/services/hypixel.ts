@@ -10,10 +10,13 @@ export interface HypixelPlayer {
     uuid?: string;
     achievements?: Record<string, number>;
     stats: {
+        [game: string]: Record<string, any> | undefined;
         Bedwars?: Record<string, any>;
         SkyWars?: Record<string, any>;
         Duels?: Record<string, any>;
-        Raw?: Record<string, any>;
+        UHC?: Record<string, any>;
+        TNTGames?: Record<string, any>;
+        MurderMystery?: Record<string, any>;
     }
 }
 
@@ -151,6 +154,85 @@ export function skywarsStats(player: HypixelPlayer): SkywarsStats {
         kills: sw.kills ?? 0,
         deaths: sw.deaths ?? 0,
         kdr: ratio(sw.kills ?? 0, sw.deaths ?? 0),
+    }
+}
+
+// uhc stats
+export interface UhcStats {
+    wins: number,
+    kills: number,
+    deaths: number,
+    kdr: number,
+    score: number,
+    headsEaten: number,
+}
+
+export function uhcStats(player: HypixelPlayer): UhcStats {
+    const uhc = player.stats?.UHC ?? {};
+    // team and solo are counted separately, neither one alone is the total
+    const kills = (uhc.kills ?? 0) + (uhc.kills_solo ?? 0);
+    return {
+        wins: (uhc.wins ?? 0) + (uhc.wins_solo ?? 0),
+        kills,
+        deaths: uhc.deaths ?? 0,
+        kdr: ratio(kills, uhc.deaths ?? 0),
+        score: uhc.score ?? 0, // what the ingame uhc title is based on
+        headsEaten: uhc.heads_eaten ?? 0,
+    }
+}
+
+// tnt games stats - no losses and no top level kills/deaths, only per mode counters
+export interface TntGamesStats {
+    wins: number,
+    winstreak: number,
+    tntRun: number,
+    pvpRun: number,
+    bowSpleef: number,
+    tntTag: number,
+    wizards: number,
+}
+
+export function tntGamesStats(player: HypixelPlayer): TntGamesStats {
+    const tnt = player.stats?.TNTGames ?? {};
+    return {
+        wins: tnt.wins ?? 0,
+        winstreak: tnt.winstreak ?? 0,
+        tntRun: tnt.wins_tntrun ?? 0,
+        pvpRun: tnt.wins_pvprun ?? 0,
+        bowSpleef: tnt.wins_bowspleef ?? 0,
+        tntTag: tnt.wins_tntag ?? 0,
+        wizards: tnt.wins_capture ?? 0,
+    }
+}
+
+// murder mystery stats
+export interface MurderMysteryStats {
+    wins: number,
+    games: number,
+    losses: number,
+    wlr: number,
+    kills: number,
+    deaths: number,
+    kdr: number,
+    murdererWins: number,
+    detectiveWins: number,
+}
+
+export function murderMysteryStats(player: HypixelPlayer): MurderMysteryStats {
+    const mm = player.stats?.MurderMystery ?? {};
+    const wins = mm.wins ?? 0;
+    const games = mm.games ?? 0;
+    const losses = Math.max(0, games - wins); // no losses field, games covers it
+    return {
+        wins,
+        games,
+        losses,
+        wlr: ratio(wins, losses),
+        kills: mm.kills ?? 0,
+        deaths: mm.deaths ?? 0,
+        kdr: ratio(mm.kills ?? 0, mm.deaths ?? 0),
+        murdererWins: mm.murderer_wins ?? 0,
+        detectiveWins: mm.detective_wins ?? 0,
     }
 }
 
