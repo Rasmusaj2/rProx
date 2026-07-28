@@ -59,3 +59,36 @@ export const COLOR_RGB: Record<McColorName, number> = {
 export function stripColorCodes(str: string): string {
     return str.replace(/§[0-9a-fk-or]/gi, "");
 }
+
+const CODE_TO_NAME = new Map<string, McColorName>(
+    (Object.entries(COLOR_CODES) as [McColorName, string][]).map(([name, code]) => [code.slice(1), name]),
+);
+
+export function colorFromCode(code: string): McColorName | undefined {
+    return CODE_TO_NAME.get(code.toLowerCase());
+}
+
+// hypixel does uppercase names so we normalize
+export function colorFromName(name: string | undefined): McColorName | undefined {
+    if (!name) return undefined;
+    const key = name.toLowerCase() as McColorName;
+    return key in COLOR_CODES ? key : undefined;
+}
+
+export function firstColor(str: string): McColorName | undefined {
+    const match = /§([0-9a-f])/i.exec(str);
+    return match ? colorFromCode(match[1]) : undefined;
+}
+
+// color appended to string after text, useful for when we change a prefix and need to know what color to continue with
+export function lastColor(str: string): McColorName | undefined {
+    const re = /§([0-9a-f])/gi;
+    let found: McColorName | undefined;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(str)) !== null) found = colorFromCode(match[1]);
+    return found;
+}
+
+export function colorToRgb(color: McColorName | undefined): number {
+    return color ? COLOR_RGB[color] : COLOR_RGB.gray;
+}
