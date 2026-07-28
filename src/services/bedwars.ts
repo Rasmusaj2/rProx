@@ -26,7 +26,7 @@ const RAINBOW_COLORS: McColorName[] = [
     "light_purple",
 ];
 
-// might have to update the star symbols
+// might have to update the star symbols idk the new ones
 function starSymbol(level: number): string {
   if (level < 1000) return "✫";
   if (level < 2000) return "✪";
@@ -43,6 +43,12 @@ export function starColor(level: number): McColorName {
     return PRESTIGE_CYCLE[Math.floor((level % 1000) / 100)] ?? "gray";
 }
 
+// colorcodeless
+export function starText(level: number): string {
+    return starSymbol(level) + level.toString();
+}
+
+// colorized
 export function formatStar(level: number): string {
     const text = starSymbol(level) + level.toString();
     if (isGradient(level)) return [...text].map((char, i) => COLOR_CODES[RAINBOW_COLORS[i % RAINBOW_COLORS.length]] + char).join("");
@@ -67,4 +73,9 @@ export function fkdrColor(fkdr: number): McColorName {
         if (fkdr < limit) return color; // this should always return a color since the last limit is Infinity but my linter doesnt like it
     }
     return "dark_purple"; // fallback for linter stuff
+}
+
+// format properly with colors
+export function formatFkdr(fkdr: number): string {
+    return COLOR_CODES[fkdrColor(fkdr)] + fkdr;
 }
