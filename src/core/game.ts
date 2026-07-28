@@ -2,14 +2,23 @@ import { stripColorCodes } from "../util/mcColors";
 import type { Tag } from "./types";
 
 // which hypixel game the client is currently looking at
-export type GameMode = "bedwars" | "skywars" | "duels" | "lobby" | "unknown";
+export type GameMode = "bedwars" 
+| "skywars" 
+| "duels" 
+| "uhc"
+| "tntgames"
+| "murdermystery"
+| "lobby" | "unknown";
 
-// the sidebar title is the giveaway - "§e§lBED WARS", "§e§lSKYWARS", ...
+// get from sidebar
 const TITLES: Array<[pattern: RegExp, game: GameMode]> = [
     [/BED\s*WARS/, "bedwars"],
     [/SKY\s*WARS/, "skywars"],
     [/DUELS?/, "duels"],
     [/HYPIXEL/, "lobby"],
+    [/UHC/, "uhc"],
+    [/TNT\s*GAMES?/, "tntgames"],
+    [/MURDER\s*MYSTERY/, "murdermystery"],
 ];
 
 export function gameFromTitle(title: string): GameMode {
