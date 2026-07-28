@@ -1,6 +1,7 @@
 import type { HttpClient } from '../util/http';
 import type { PlayerRef } from '../core/types';
 import { dashUuid } from '../services/microsoft';
+import { stripColorCodes } from '../util/mcColors';
 
 
 export interface HypixelPlayer {
@@ -119,7 +120,9 @@ export function bedwarsStats(player: HypixelPlayer): BedwarsStats {
 
 // skywars stats
 export interface SkywarsStats {
-    level: number,
+    level: number, // 0 when the player has never touched skywars
+    levelFormatted: string, // hypixels own rendering, e.g. "§223✦"
+    levelText: string, // the same with codes stripped, e.g. "23✦"
     wins: number,
     losses: number,
     wlr: number,
@@ -127,21 +130,21 @@ export interface SkywarsStats {
     deaths: number,
     kdr: number,
 }
-const SW_XP = [0, 20, 70, 150, 250, 500, 1000, 2000, 3500, 6000, 10000, 15000]
-export function skywarsLevel(xp: number): number {
-    let level = 0;
-    if (xp >= 15000) return 12 + Math.floor((xp - 15000) / 10000);
-    for (let i = 0; i < SW_XP.length; i++) {
-        if (xp >= SW_XP[i]) level = i;
-    }
-    return level;
+
+// deprecate old xp table since angels descent update i forgot about this
+// we can just get the skywars level from the hypixel api now 
+export function skywarsLevel(levelFormatted: string): number {
+    const digits = stripColorCodes(levelFormatted).match(/\d+/);
+    return digits ? Number(digits[0]) : 0;
 }
 
 export function skywarsStats(player: HypixelPlayer): SkywarsStats {
     const sw = player.stats?.SkyWars ?? {};
-    const xp = sw.skywars_experience ?? 0;
+    const levelFormatted: string = typeof sw.levelFormatted === "string" ? sw.levelFormatted : "";
     return {
-        level: skywarsLevel(xp),
+        level: skywarsLevel(levelFormatted),
+        levelFormatted,
+        levelText: stripColorCodes(levelFormatted),
         wins: sw.wins ?? 0,
         losses: sw.losses ?? 0,
         wlr: ratio(sw.wins ?? 0, sw.losses ?? 0),

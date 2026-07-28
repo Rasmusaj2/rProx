@@ -4,6 +4,13 @@ module.exports = {
     description: "An example plugin for the rProx proxy.",
 
     setup(api) {
-        // Functionality called when the plugin is loaded
+        
+        api.registerCommand({
+            name: "ping",
+            description: "An example command.",
+            execute: async (args, context) => {
+                context.sendMessage("Pong!");
+            }
+        });
     }
 }
