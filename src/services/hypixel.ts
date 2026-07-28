@@ -4,6 +4,7 @@ import { dashUuid } from '../services/microsoft';
 
 
 export interface HypixelPlayer {
+    [key: string]: unknown;
     username?: string;
     uuid?: string;
     achievements?: Record<string, number>;
@@ -43,10 +44,10 @@ export class HypixelService {
         if (!dashed) return { status: "unresolved" };
         const cacheKey = `hypixel:${dashed}`;
         const cached = this.cache.get(cacheKey);
-        if (cached) return cached.result;
+        if (cached && cached.expires > Date.now()) return cached.result;
 
         const res = await this.http.send<HypixelResponse>(
-            `https://api.hypixel.net/player?key=&uuid=${dashed}`,
+            `https://api.hypixel.net/player?uuid=${dashed}`,
             "GET", 
             { headers: { "API-Key": this.apiKey }, timeout: 5000 }
         );
