@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 export interface Config {
     proxy: {
-        listenHost: string, // localhost
+        listenHost: string, // 127.0.0.1 - "localhost" binds ipv6 and minecraft doesnt like that
         listenPort: number, // 25565
         targetHost: string, // mc.hypixel.net
         targetPort: number, // 25565
@@ -16,6 +16,7 @@ export interface Config {
         dir: string, // ./auth
         requireMatchingAccount: boolean, // true - can allow linking to another account if false
     },
+    commandPrefix: string, // // - what marks a message as a proxy command instead of chat
     detection: {
         autoWhoOnStart: boolean, // true - automatically send /who on server join
         ignoreSelf: boolean, // false - ignore self in /who detection
@@ -26,7 +27,7 @@ export interface Config {
 
 const DEFAULTS: Config = {
     proxy: {
-        listenHost: "localhost",
+        listenHost: "127.0.0.1",
         listenPort: 25565,
         targetHost: "mc.hypixel.net",
         targetPort: 25565,
@@ -39,6 +40,7 @@ const DEFAULTS: Config = {
         dir: "./auth",
         requireMatchingAccount: true,
     },
+    commandPrefix: "//",
     detection: {
         autoWhoOnStart: true,
         ignoreSelf: false,
