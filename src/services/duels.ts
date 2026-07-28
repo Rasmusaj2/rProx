@@ -16,6 +16,8 @@ export function winsColor(wins: number): McColorName {
     for (const [limit, color] of WIN_TIERS) {
         if (wins < limit) return color;
     }
+    return "dark_purple";
+}
 
 export function winsText(wins: number): string {
     return wins.toString() + "W";
