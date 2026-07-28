@@ -5,7 +5,7 @@ import { dashUuid } from '../services/microsoft';
 
 export interface HypixelPlayer {
     [key: string]: unknown;
-    username?: string;
+    displayname?: string;
     uuid?: string;
     achievements?: Record<string, number>;
     stats: {
