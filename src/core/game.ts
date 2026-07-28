@@ -32,7 +32,7 @@ export function gameFromTitle(title: string): GameMode {
 // lobbies and games we dont know fall back to bedwars, thats what most of this
 // is built around and its what used to show everywhere
 export function statsGame(game: GameMode): GameMode {
-    return game === "skywars" || game === "duels" ? game : "bedwars";
+    return game === "lobby" || game === "unknown" ? "bedwars" : game;
 }
 
 // tags with no game on them are game agnostic (cheater flags and the like)
