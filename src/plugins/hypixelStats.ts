@@ -10,6 +10,7 @@ import {
     murderMysteryStats,
     fishingStats,
     fetchErrorMessage,
+    MYTHICAL_FANCY_NAMES,
     type HypixelPlayer,
 } from "../services/hypixel";
 import { formatStar, starText, starColor, formatFkdr, fkdrColor } from "../services/bedwars";
@@ -333,10 +334,31 @@ export const hypixelStatsPlugin: Plugin = {
                 }
                 session.chat.text(`  §7Mythical: ${fish.formatMythical(s.mythicalCaught)}  §7Catches: ${fish.formatCatches(s.totalCatches)}  §7Special: ${c("white", s.specialCaught)}`);
                 session.chat.text(`  §7Fish: ${c("white", s.fishCaught.toLocaleString())}  §7Treasure: ${c("white", s.treasureCaught.toLocaleString())}  §7Junk: ${c("white", s.junkCaught.toLocaleString())}`);
-                const areas = Object.entries(s.areas)
-                    .map(([name, a]) => `§7${name[0].toUpperCase()}${name.slice(1)}: ${c("white", a.fishCaught.toLocaleString())}`)
-                    .join("  ");
-                if (areas) session.chat.text(`  ${areas}`);
+                session.chat.text(`  §7Plants: ${c("white", s.plantsCaught.toLocaleString())}  §7Creatures: ${c("white", s.creaturesCaught.toLocaleString())}`);
+                
+                // per area
+                for (const [name, a] of Object.entries(s.areas)) {
+                    session.chat.text(
+                        `  §f${name[0].toUpperCase()}${name.slice(1)}§8: §7fish ${c("white", a.fishCaught.toLocaleString())}` +
+                        `  §7treasure: ${c("white", a.treasureCaught.toLocaleString())}` +
+                        `  §7junk: ${c("white", a.junkCaught.toLocaleString())}` +
+                        `  §7plants: ${c("white", a.plantsCaught.toLocaleString())}` +
+                        `  §7creatures: ${c("white", a.creaturesCaught.toLocaleString())}`,
+                    );
+                    session.chat.text(``)
+                }
+
+                // orbs (mythical) weights + amount + fancy name and coloring correctly for high weight rolls
+                const mythicals = Object.entries(s.mythicalCaughtIndividual)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([orb, count]) => {
+                        const weight = s.mythicalWeight[orb] ?? 0;
+                        // gold means they landed the top of that orbs weight range
+                        return `§7${MYTHICAL_FANCY_NAMES[orb] ?? orb}: ${c("white", count.toLocaleString())}${weight ? ` §8(${fish.formatWeight(orb, weight)}§8)` : ""}`;
+                    });
+                for (let i = 0; i < mythicals.length; i += 2) {
+                    session.chat.text(`  ${mythicals.slice(i, i + 2).join("  ")}`);
+                }
             },
             "Lobby Fishing stats for a player (or yourself)",
         );

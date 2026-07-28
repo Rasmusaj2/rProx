@@ -281,17 +281,6 @@ export function duelsStats(player: HypixelPlayer): DuelsStats {
 
 
 
-/* 
-    NOTES ABOUT (missing mostly) FISHING STUFF:
-    1) Creatures (idk what this is) are not included, neither in the Total catches
-    2) Can add fishing rod stats
-    3) Orb weights
-    4) events
-    5) specific special fish caught
-    6) fireproofing + ice fishing nereid
-
-    WHO CARES. all of this can be done later
-*/
 
 export interface FishingStats {
     totalCatches: number,
@@ -299,7 +288,10 @@ export interface FishingStats {
     treasureCaught: number,
     junkCaught: number,
     plantsCaught: number,
+    creaturesCaught: number,
     mythicalCaught: number,
+    mythicalCaughtIndividual: Record<string, number>,
+    mythicalWeight: Record<string, number>,
     specialCaught: number
     areas: Record<string, AreaFishingStats>
 }
@@ -309,13 +301,38 @@ export interface AreaFishingStats {
     fishCaught: number,
     treasureCaught: number,
     junkCaught: number,
-    plantsCaught: number
+    plantsCaught: number,
+    creaturesCaught: number
 }
 
 // lobby fishing is cancer because its stored so far down in the stats tree
 // its stored under stats.MainLobby.fishing.stats.permanent, and the permanent object has a key for each area
 // this also stores stats for each season, but we can implement that later
 const FISHING_AREAS = ["water", "lava", "ice"] as const;
+
+export const MYTHICAL_ORBS = ["helios", "selene", "nyx", "aphrodite", "zeus", "demeter", "hades", "archimedes"] as const;
+export const MYTHICAL_FANCY_NAMES: Record<string, string> = {
+    helios: "Ember of Helios",
+    selene: "Dust of Selene",
+    nyx: "Shadow of Nyx",
+    zeus: "Spark of Zeus",
+    demeter: "Spirit of Demeter",
+    aphrodite: "Heart of Aphrodite",
+    hades: "Wrath of Hades",
+    archimedes: "Automaton of Daedalus",
+};
+
+// weight rolls
+export const MYTHICAL_ORB_WEIGHTS: Record<string, [min: number, max: number]> = {
+    helios: [1, 15],
+    selene: [1, 15],
+    nyx: [10, 25],
+    aphrodite: [10, 25],
+    zeus: [20, 40],
+    demeter: [20, 40],
+    hades: [30, 50],
+    archimedes: [30, 50],
+}
 
 export function fishingStats(player: HypixelPlayer): FishingStats | null {
     const fishing = player.stats?.MainLobby?.fishing;
@@ -330,9 +347,10 @@ export function fishingStats(player: HypixelPlayer): FishingStats | null {
             treasureCaught: raw.treasure ?? 0,
             junkCaught: raw.junk ?? 0,
             plantsCaught: raw.plant ?? 0,
+            creaturesCaught: raw.creature ?? 0,
             totalCatches: 0,
         };
-        area.totalCatches = area.fishCaught + area.treasureCaught + area.junkCaught + area.plantsCaught;
+        area.totalCatches = area.fishCaught + area.treasureCaught + area.junkCaught + area.plantsCaught + area.creaturesCaught;
         if (area.totalCatches > 0) areas[name] = area;
     }
 
@@ -340,17 +358,21 @@ export function fishingStats(player: HypixelPlayer): FishingStats | null {
         Object.values(areas).reduce((total, area) => total + pick(area), 0);
 
     // hypixel exposes no mythical counter, also its still called orbs
-    // we (should) loop over but this is fine for now i cant be btohered
-    let mythical = 
-    (fishing.orbs?.helios ?? 0) + 
-    (fishing.orbs?.selene ?? 0) + 
-    (fishing.orbs?.nyx ?? 0) + 
-    (fishing.orbs?.zeus ?? 0) + 
-    (fishing.orbs?.demeter ?? 0) +
-    (fishing.orbs?.aphrodite ?? 0) +
-    (fishing.orbs?.hades ?? 0) +
-    (fishing.orbs?.archimedes ?? 0);
-    
+    // looped over properly now
+    // counts sit on fishing.orbs, not under permanent, and the weights are a
+    // sub-object of that same orbs record rather than a sibling key
+    let mythical = 0;
+    let weight: Record<string, number> = {};
+    let mythicalIndividual: Record<string, number> = {};
+    const orbs = fishing.orbs ?? {};
+    for (const orb of MYTHICAL_ORBS) {
+        const count = orbs[orb] ?? 0;
+        if (count > 0) {
+            mythical += count;
+            weight[orb] = orbs.weight?.[orb] ?? 0;
+            mythicalIndividual[orb] = count;
+        }
+    }
 
     return {
         totalCatches: sum((a) => a.totalCatches) + mythical,
@@ -358,7 +380,10 @@ export function fishingStats(player: HypixelPlayer): FishingStats | null {
         treasureCaught: sum((a) => a.treasureCaught),
         junkCaught: sum((a) => a.junkCaught),
         plantsCaught: sum((a) => a.plantsCaught),
+        creaturesCaught: sum((a) => a.creaturesCaught),
         mythicalCaught: mythical,
+        mythicalCaughtIndividual: mythicalIndividual,
+        mythicalWeight: weight,
         specialCaught: Object.keys(fishing.special_fish ?? {}).length,
         areas,
     }

@@ -1,4 +1,18 @@
 import { COLOR_CODES, type McColorName } from "../util/mcColors";
+import { MYTHICAL_ORB_WEIGHTS } from "./hypixel";
+
+// weight stuff blah blah
+export function weightColor(orb: string, weight: number): McColorName {
+    const range = MYTHICAL_ORB_WEIGHTS[orb];
+    if (!range) return "white";
+    const [min, max] = range;
+    if (weight >= max) return "gold";
+    return weight >= (min + max) / 2 ? "white" : "gray";
+}
+
+export function formatWeight(orb: string, weight: number): string {
+    return COLOR_CODES[weightColor(orb, weight)] + weight + "kg";
+}
 
 // mythical catches are the headline number, so the ladder is built around them
 const FISHING_TIERS: Array<[limit: number, color: McColorName]> = [
@@ -25,7 +39,7 @@ function compact(value: number, suffix: string): string {
 }
 
 export function mythicalText(mythical: number): string {
-    return compact(mythical, "M");
+    return compact(mythical, " M");
 }
 
 export function formatMythical(mythical: number): string {
@@ -51,7 +65,7 @@ export function catchesColor(catches: number): McColorName {
 }
 
 export function catchesText(catches: number): string {
-    return compact(catches, "C");
+    return compact(catches, " C");
 }
 
 export function formatCatches(catches: number): string {
