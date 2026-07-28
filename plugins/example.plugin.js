@@ -4,13 +4,9 @@ module.exports = {
     description: "An example plugin for the rProx proxy.",
 
     setup(api) {
-        
-        api.registerCommand({
-            name: "ping",
-            description: "An example command.",
-            execute: async (args, context) => {
-                context.sendMessage("Pong!");
-            }
-        });
+        api.registerCommand(
+            "ping",
+            async (args, session) => { session.chat.text("pong") },
+            "Responds with 'pong' to test the plugin.")
     }
 }
