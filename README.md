@@ -5,7 +5,7 @@ rProx is a Hypixel Proxy Service, acting as a middleman between your client & th
 rProx watches who joins your games & lobbies, and looks up playerdata and stats
 
 ## Public Service
-rProx runs a public test-proxy available at `temp.rasmus.zip`
+rProx runs a public test-proxy available at `rprox.rasmus.zip`
 
 Please be aware that this server will store your Session Token when logging in. Use it with caution. 
 
