@@ -9,7 +9,7 @@ export interface RankInfo {
 const DEFAULT_RANK: RankInfo = { display: "", color: "gray" };
 
 const STAFF: Record<string, RankInfo> = {
-    STAFF: { display: "§2[STAFF]", color: "red" }, // afaik the new staff rank returns this for all staff members
+    STAFF: { display: "§c[ዞ]", color: "red" }, // afaik the new staff rank returns this for all staff members
     // but i havent actually checked yet, so im keeping legacy ranks here just in case (also yt i guess)
     ADMIN: { display: "§c[ADMIN]", color: "red" },
     OWNER: { display: "§c[OWNER]", color: "red" },
