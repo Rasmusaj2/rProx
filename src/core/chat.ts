@@ -14,6 +14,7 @@ export interface ChatPart {
     tooltip?: string;
     runCommand?: string;
     suggestCommand?: string;
+    openUrl?: string; 
 }
 
 type ChatRegistry = {
@@ -75,6 +76,7 @@ export function component(parts: ChatPart[]): Record<string, unknown> {
         if (part.tooltip) node.hoverEvent = { action: "show_text", value: { text: part.tooltip } };
         if (part.runCommand) node.clickEvent = { action: "run_command", value: part.runCommand };
         else if (part.suggestCommand) node.clickEvent = { action: "suggest_command", value: part.suggestCommand };
+        else if (part.openUrl) node.clickEvent = { action: "open_url", value: part.openUrl };
         return node;
     });
     return { text: "", extra };

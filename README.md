@@ -36,6 +36,14 @@ After this rProx will be running on localhost:25565
 
 `//sw [user]` - Shows a players SkyWars statistics
 
+`//mm [user]` - Shows a players Murder Mystery statistics
+
+`//fish [user]` - Shows a players Lobby Fishing statistics
+
+`//tnt [user]` - Shows a players TNT Games statistics
+
+`//uhc [user]` - Shows a players UHC statistics
+ 
 `//duels [user] [gamemode]` - Shows a players Duels statistics
 
 **Misc.**
@@ -43,6 +51,10 @@ After this rProx will be running on localhost:25565
 `//who` - Alias for Hypixel /who
 
 `//plugins` - View loaded and available plugins
+
+`//reward [link]` - Show the daily reward options for the last link seen in chat 
+
+`//reward claim [1-3]` - Claim a daily reward, highest tier if no option is given
 
 ### Extendable plugins
 rProx supports custom Plugins to add extended functionality and stat checking features.

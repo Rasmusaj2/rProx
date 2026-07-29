@@ -30,6 +30,12 @@
             "tablist": true,
             "maxTablistPlayers": 32,
             "cacheTtlSeconds": 120
+        },
+        "dailyRewards": {
+            "enabled": true,
+            "mode": "chat",
+            "prefer": [],
+            "timeoutMs": 10000
         }
     },
     "pluginDirectory": "./plugins"

@@ -11,6 +11,7 @@ import { PREFIX } from "./core/chat";
 import { createCoreCommandsPlugin } from "./plugins/coreCommands";
 import { hypixelStatsPlugin } from "./plugins/hypixelStats";
 import { createNametagStatsPlugin } from "./plugins/nametagStats";
+import { dailyRewardsPlugin } from "./plugins/dailyRewards";
 
 async function main(): Promise<void> {
     const config = loadConfig();
@@ -27,6 +28,7 @@ async function main(): Promise<void> {
         createCoreCommandsPlugin(enrichment, plugins, config.commandPrefix), // forceload
         hypixelStatsPlugin,
         createNametagStatsPlugin(enrichment),
+        dailyRewardsPlugin,
     ]);
 
     // then whatever is sitting in the plugin directory
