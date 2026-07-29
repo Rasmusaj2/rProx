@@ -189,17 +189,26 @@ export class ProxyServer {
         };
 
         // hypixel to client: forward packets, intercept for anything we need to handle or react to
-        target.on("raw", (buffer: Buffer, meta: { state: string }) => {
+        target.on("raw", (buffer: Buffer, meta: { name: string; state: string }) => {
+            // chat is the one packet we do not blind-forward, see below
+            if (meta.name === "chat") return;
             if (meta.state === states.PLAY && client.state === states.PLAY) client.writeRaw(buffer);
         });
         target.on("packet", (data: any, meta: { name: string; state: string }) => {
             if (meta.state !== states.PLAY) return;
+            let hideChat = false;
             try {
-                if (meta.name === "chat") this.onServerChat(data, session, clog);
+                if (meta.name === "chat") hideChat = this.onServerChat(data, session, clog);
                 else if (meta.name === "player_info") lobby.applyPlayerInfo(data as PlayerInfoPacket);
                 this.bus.emit("serverPacket", meta.name, data, session);
             } catch (error) {
                 clog.debug(`parse error: ${error}`);
+            }
+            // "packet" fires before "raw", so writing chat here keeps it in the same
+            // spot in the stream while letting a plugin swallow the line entirely.
+            // anything that threw above lands here with hideChat still false
+            if (meta.name === "chat" && !hideChat && client.state === states.PLAY) {
+                client.write("chat", { message: data.message, position: data.position ?? 0 });
             }
         });
         target.once("login", () => clog.info("upstream authenticated & connected"));
@@ -222,9 +231,11 @@ export class ProxyServer {
         this.bus.emit("sessionStart", session);
     }
 
-    private onServerChat(data: { message: unknown; position?: number }, session: Session, clog: Logger): void {
+    // true means a plugin asked for this line to be hidden from the client
+    private onServerChat(data: { message: unknown; position?: number }, session: Session, clog: Logger): boolean {
         const chat: ChatMessage = parseChat(this.config.proxy.version, data.message, data.position ?? 0);
-        if (chat.position === 2) return; // action bar spam
+        if (chat.position === 2) return false; // action bar spam
+        const hide = this.plugins.hidesChat(chat, session);
         this.bus.emit("chat", chat, session);
 
         const names = parseWhoResponse(chat.text);
@@ -232,12 +243,12 @@ export class ProxyServer {
             for (const name of names) {
                 this.bus.emit("playerDetected", session.findPlayer(name) ?? { name }, "GAME", session);
             }
-            return;
+            return hide;
         }
 
-        if (!GAME_START_PATTERNS.some((pattern) => pattern.test(chat.text))) return;
+        if (!GAME_START_PATTERNS.some((pattern) => pattern.test(chat.text))) return hide;
         const last = this.lastGameStart.get(session.id) ?? 0;
-        if (Date.now() - last < GAME_START_COOLDOWN_MS) return;
+        if (Date.now() - last < GAME_START_COOLDOWN_MS) return hide;
         this.lastGameStart.set(session.id, Date.now());
 
         if (this.config.detection.autoWhoOnStart) { // honestly this is terrible rn because of it triggering during countdown
@@ -250,6 +261,7 @@ export class ProxyServer {
             .filter((p) => !this.config.detection.ignoreSelf || p.name.toLowerCase() !== session.username.toLowerCase());
         clog.info(`checking ${players.length} tab-list players`);
         for (const player of players) this.bus.emit("playerDetected", player, "GAME", session);
+        return hide;
     }
 
     private async onCommand(raw: string, session: Session, clog: Logger): Promise<void> {

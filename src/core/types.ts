@@ -68,6 +68,10 @@ export interface ChatMessage {
 
 export type CommandHandler = (args: string[], session: Session) => void | Promise<void>;
 
+// return true to stop a line from ever reaching the client. runs before the
+// chat event, so other plugins still see what got hidden
+export type ChatFilter = (msg: ChatMessage, session: Session) => boolean | void;
+
 export interface ProxyEvents {
     sessionStart: (session: Session) => void;
     sessionEnd: (session: Session) => void;
@@ -86,6 +90,7 @@ export interface PluginApi {
     on<K extends keyof ProxyEvents>(event: K, handler: ProxyEvents[K]): void;
     registerEnricher(enricher: Enricher): void;
     registerCommand(name: string, handler: CommandHandler, help?: string): void;
+    registerChatFilter(filter: ChatFilter): void;
 }
 
 export interface Plugin {

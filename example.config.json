@@ -36,6 +36,15 @@
             "mode": "chat",
             "prefer": [],
             "timeoutMs": 10000
+        },
+        "antiAfk": {
+            "enabled": false,
+            "intervalSeconds": 150,
+            "prefix": "[AFK] ",
+            "charset": "abcdefghijklmnopqrstuvwxyz0123456789",
+            "messageLength": 16,
+            "hideMessages": true,
+            "autoStart": true
         }
     },
     "pluginDirectory": "./plugins"

@@ -56,6 +56,8 @@ After this rProx will be running on localhost:25565
 
 `//reward claim [1-3]` - Claim a daily reward, highest tier if no option is given
 
+`//afk [on|off]` - Toggle anti-afk, which DMs you a random string every `intervalSeconds` and hides the To/From echo
+
 ### Extendable plugins
 rProx supports custom Plugins to add extended functionality and stat checking features.
 

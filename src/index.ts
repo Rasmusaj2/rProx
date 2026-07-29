@@ -12,6 +12,7 @@ import { createCoreCommandsPlugin } from "./plugins/coreCommands";
 import { hypixelStatsPlugin } from "./plugins/hypixelStats";
 import { createNametagStatsPlugin } from "./plugins/nametagStats";
 import { dailyRewardsPlugin } from "./plugins/dailyRewards";
+import { antiAfkPlugin } from "./plugins/antiAfk";
 
 async function main(): Promise<void> {
     const config = loadConfig();
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
         hypixelStatsPlugin,
         createNametagStatsPlugin(enrichment),
         dailyRewardsPlugin,
+        antiAfkPlugin,
     ]);
 
     // then whatever is sitting in the plugin directory

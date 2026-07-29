@@ -6,7 +6,7 @@ import type { HttpClient } from "../util/http";
 import type { Config } from "../config";
 import type { EventBus } from "./events";
 import type { EnrichmentEngine } from "./enrichment";
-import type { CommandHandler, Plugin, PluginApi } from "./types";
+import type { ChatFilter, ChatMessage, CommandHandler, Plugin, PluginApi, Session } from "./types";
 
 const log = createLogger("plugins");
 
@@ -22,6 +22,7 @@ interface RegisteredCommand {
 
 export class PluginManager {
     private commands = new Map<string, RegisteredCommand>();
+    private chatFilters: Array<{ filter: ChatFilter; plugin: string }> = []; // allow plugins to add chat filters so they can hide messages from the client for data collection (ie. running /who and needing to hide it or dms from antiafk)
     private loaded: string[] = [];
 
     constructor(
@@ -50,7 +51,22 @@ export class PluginManager {
                 }
                 this.commands.set(key, { handler, help, plugin: plugin.name });
             },
+            registerChatFilter: (filter) => this.chatFilters.push({ filter, plugin: plugin.name }),
         };
+    }
+
+    // does any plugin want this line kept away from the client
+    hidesChat(msg: ChatMessage, session: Session): boolean {
+        let hide = false;
+        for (const { filter, plugin } of this.chatFilters) {
+            try {
+                // keep going after a hit so every filter still sees the line
+                if (filter(msg, session) === true) hide = true;
+            } catch (error) {
+                log.error(`chat filter from "${plugin}" threw: ${error}`);
+            }
+        }
+        return hide;
     }
 
     // a plugin is on unless its config block says enabled: false
