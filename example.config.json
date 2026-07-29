@@ -44,7 +44,8 @@
             "charset": "abcdefghijklmnopqrstuvwxyz0123456789",
             "messageLength": 16,
             "hideMessages": true,
-            "autoStart": true
+            "autoStart": true,
+            "targetUser": null
         }
     },
     "pluginDirectory": "./plugins"

@@ -9,6 +9,7 @@ interface AntiAfkConfig {
     messageLength?: number;
     hideMessages?: boolean; // swallow the To/From echo
     autoStart?: boolean; // start on join, or wait for //afk
+    targetUser?: string; // use a targetUser instead of yourself for the DM, lets you avoid the "pling" on dm
 }
 
 const DEFAULT_CHARSET = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -22,6 +23,14 @@ const KEEP_TOKENS = 4;
 interface AfkState {
     timer: NodeJS.Timeout;
     tokens: string[];
+}
+
+// finding the "to user" line
+function recipientOf(text: string): string | undefined {
+    const colon = text.indexOf(":");
+    if (colon === -1) return undefined;
+    const words = text.slice("To ".length, colon).trim().split(/\s+/);
+    return words[words.length - 1]?.toLowerCase() || undefined;
 }
 
 export const antiAfkPlugin: Plugin = {
@@ -43,6 +52,7 @@ export const antiAfkPlugin: Plugin = {
         }
         const hideMessages = config.hideMessages !== false;
         const autoStart = config.autoStart !== false;
+        const messagePrefix = config.prefix ?? "";
 
         const sessions = new Map<string, AfkState>();
 
@@ -58,12 +68,16 @@ export const antiAfkPlugin: Plugin = {
             return token;
         };
 
+        // who the dm goes to, yourself unless an alt is configured
+        const targetOf = (session: Session) => config.targetUser || session.username;
+
         const tick = (session: Session, tokens: string[]): void => {
-            const token = config.prefix + randomToken(tokens[tokens.length - 1]);
+            const token = messagePrefix + randomToken(tokens[tokens.length - 1]);
             tokens.push(token);
             if (tokens.length > KEEP_TOKENS) tokens.shift();
-            session.sendUpstream(`/msg ${session.username} ${token}`);
-            api.log.debug(`anti-afk dm for ${session.username}: ${token}`);
+            const target = targetOf(session);
+            session.sendUpstream(`/msg ${target} ${token}`);
+            api.log.debug(`anti-afk dm for ${session.username}: ${token} (message sent to ${target})`);
         };
 
         const running = (session: Session) => sessions.has(session.id);
@@ -91,10 +105,10 @@ export const antiAfkPlugin: Plugin = {
         if (hideMessages) {
             api.registerChatFilter((msg, session) => {
                 const state = sessions.get(session.id);
-                if (!state || state.tokens.length === 0) return false;
+                if (!state) return false;
                 const text = msg.text.trim();
-                // only hide messages that are To or From yourself, and end with a recent token
-                if (!text.startsWith("To ") && !text.startsWith("From ")) return false;
+                if (text.startsWith("To ")) return recipientOf(text) === targetOf(session).toLowerCase();
+                if (!text.startsWith("From ") || state.tokens.length === 0) return false;
                 if (!text.includes(session.username)) return false;
                 return state.tokens.some((token) => text.endsWith(token));
             });
@@ -116,7 +130,7 @@ export const antiAfkPlugin: Plugin = {
                 if (wanted) {
                     start(session);
                     session.chat.text(
-                        `${PREFIX} §aAnti-AFK on §7- messaging yourself every §f${interval}s` +
+                        `${PREFIX} §aAnti-AFK on §7- messaging §f${config.targetUser || "yourself"}§7 every §f${interval}s` +
                             `§7${hideMessages ? " §8(echo hidden)" : ""}`,
                     );
                 } else {
