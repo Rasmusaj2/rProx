@@ -16,6 +16,7 @@ import {
     type RewardFetch,
     type RewardSession,
 } from "../services/rewards";
+import { COLOR_CODES } from "../util/mcColors";
 
 interface DailyRewardsConfig {
     enabled?: boolean;
@@ -98,7 +99,7 @@ export const dailyRewardsPlugin: Plugin = {
                             {
                                 text: index === best ? " §8[§aCLAIM §e★§8]" : " §8[§fCLAIM§8]",
                                 runCommand: `${prefix}reward claim ${index + 1}`,
-                                tooltip: `§7Claim ${rarityColor(reward.rarity)}${label}§7`,
+                                tooltip: `§7Claim ${COLOR_CODES[rarityColor(reward.rarity)]}${label}§7`,
                             },
                         ]),
                     ),
