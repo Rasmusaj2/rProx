@@ -4,15 +4,6 @@ rProx is a Hypixel Proxy Service, acting as a middleman between your client & th
 
 rProx watches who joins your games & lobbies, and looks up playerdata and stats
 
-## Public Service
-rProx runs a public test-proxy available at `rprox.rasmus.zip`
-
-Please be aware that this server will store your Session Token when logging in. Use it with caution. 
-
-⚠️**Do not use third party hosts. These can be malicious and steal your account and/or session token.**
-
-It is recommended to run rProx locally, as this also reduces your latency. This test proxy is hosted in Germany, so your ping will increase accordingly to routing through a VPN in Germany, then back to the Hypixel Network.
-
 ## Setup & Download
 Clone the reposity & install the required dependencies.
 ```bash
