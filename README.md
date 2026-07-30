@@ -49,6 +49,65 @@ After this rProx will be running on localhost:25565
 
 `//afk [on|off]` - Toggle anti-afk, which DMs you a random string every `intervalSeconds` and hides the To/From echo
 
+### Core Plugin Configuration
+
+rProx comes with 5 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk & a daily reward handler
+
+Configuration for these are set in [`config.json`](config.json) section called `builtInPlugins` - This section also works for configuration for external plugins, but the tooling for this is uncomplete.
+
+The built in plugins include:
+
+* **hypixelStats**
+
+Allows usage of //bw, //sw, //uhc, etc.
+```json
+{
+    "enabled": true, 
+    "apiKey": "", // Hypixel API Key
+    "cacheTtlSeconds": 300
+}
+```
+* **nametagStats**
+
+Shows player statistics in the tab menu or above their playerhead in lobbies & games
+```json
+"nametagStats": {
+    "enabled": true,
+    "aboveHead": true, // show stats above the players head
+    "tablist": true, // show stats in the tablist
+    "maxTablistPlayers": 32, // max amount of people to check at once
+    "cacheTtlSeconds": 120
+} // NOTE: API Key here leeches from hypixelStats
+```
+* **dailyRewards**
+
+Automatically claims daily reward links in chat
+```json
+"dailyRewards": {
+    "enabled": true,
+    "mode": "chat", // chat or auto - Decides if it should automatically claim a link when seen, or give the option to pick in chat
+    "prefer": [], // which specific game to prefer, ie. "uhc", "skywars", "walls3". Will autopick this incase of ties
+    "timeoutMs": 10000
+}
+```
+* **antiAfk**
+
+Prevents you from being afk-kicked in lobbies
+
+Can be toggled with `//afk on` & `//afk off`
+```json
+"antiAfk": {
+    "enabled": false, // NOTE - by default this is the only plugin thats deactivated
+    "intervalSeconds": 150, // time between triggering
+    "prefix": "[AFK] ", // message prefix
+    "charset": "abcdefghijklmnopqrstuvwxyz0123456789", // characters to pick from when designing a random message
+    "messageLength": 16, // how long the random message should be
+    "hideMessages": true, // if the messages should be hidden from you
+    "autoStart": true, // if should be enabled on login, or you have to use //afk on
+    "targetUser": null // what user to message. If null, will message yourself.
+}
+```
+
 ### Extendable plugins
 rProx supports custom Plugins to add extended functionality and stat checking features.
 
