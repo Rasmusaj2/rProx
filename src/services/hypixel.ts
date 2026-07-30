@@ -108,7 +108,7 @@ export function bedwarsStats(player: HypixelPlayer): BedwarsStats {
     const bw = player.stats?.Bedwars ?? {};
     
     return {
-        level: (player.achievements?.bedwars_level ?? 1) - 1, // bedwars stars in ap is +1 for some reason
+        level: (player.achievements?.bedwars_level ?? 1), // bedwars stars in ap is +1 for some reason (apparently not it was just tweaking?)
         finalKills: bw.final_kills_bedwars ?? 0,
         finalDeaths: bw.final_deaths_bedwars ?? 0,
         fkdr: ratio(bw.final_kills_bedwars ?? 0, bw.final_deaths_bedwars ?? 0),
