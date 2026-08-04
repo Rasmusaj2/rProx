@@ -39,7 +39,8 @@ function isGradient(level: number): boolean {
 }
 
 export function starColor(level: number): McColorName {
-    if (isGradient(level)) return "gray"; // placeholder for gradient
+    // no room for per-char codes inside a single team prefix (16 chars)
+    if (isGradient(level)) return RAINBOW_COLORS[0];
     return PRESTIGE_CYCLE[Math.floor((level % 1000) / 100)] ?? "gray";
 }
 
