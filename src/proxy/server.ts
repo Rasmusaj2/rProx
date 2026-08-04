@@ -200,6 +200,8 @@ export class ProxyServer {
             try {
                 if (meta.name === "chat") hideChat = this.onServerChat(data, session, clog);
                 else if (meta.name === "player_info") lobby.applyPlayerInfo(data as PlayerInfoPacket);
+                // forced to clear lobby on login because hypixel sends a player_info packet 
+                else if (meta.name === "login") lobby.clear();
                 this.bus.emit("serverPacket", meta.name, data, session);
             } catch (error) {
                 clog.debug(`parse error: ${error}`);
