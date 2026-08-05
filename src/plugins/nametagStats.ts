@@ -67,21 +67,30 @@ function buildSuffix(tags: Tag[], budget: number): string {
 }
 
 // bracketed prefix, e.g. "§8[§b✫312§8] "
-function buildPrefix(tags: Tag[]): string {
-    const parts = [...tags].sort(byPriority).map(renderTag);
-    return parts.length ? `§8[${parts.join("§8 ")}§8] ` : "";
+// budget caps the rendered length. drop the lowest priority tags until it fits
+function buildPrefix(tags: Tag[], budget = Infinity): string {
+    const parts = [...tags]
+        .sort(byPriority)
+        .filter((tag) => tag.formatted || (tag.short ?? tag.text))
+        .map(renderTag);
+    while (parts.length) {
+        const out = `§8[${parts.join("§8 ")}§8] `;
+        if (out.length <= budget) return out;
+        parts.pop();
+    }
+    return "";
 }
 
 // the pair of builders a name gets decorated with
 // use factory-ish patterns to have different renderers for each gamemode
 interface NametagRenderer {
-    prefix(tags: Tag[]): string;
+    prefix(tags: Tag[], budget?: number): string;
     suffix(tags: Tag[], budget: number): string;
 }
 
 function makeRenderer(game: GameMode): NametagRenderer {
     return {
-        prefix: (tags) => buildPrefix(tagsForGame(tags, game).filter((t) => t.prefix)),
+        prefix: (tags, budget) => buildPrefix(tagsForGame(tags, game).filter((t) => t.prefix), budget),
         suffix: (tags, budget) => buildSuffix(tagsForGame(tags, game).filter((t) => !t.prefix), budget),
     };
 }
@@ -124,7 +133,7 @@ function limiter(max: number): (fn: () => Promise<void>) => void {
 export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin { // this is not 
     return {
         name: "nametagStats",
-        version: "0.1.0",
+        version: "0.1.1",
         description: "Stats on tab list entries and above-head nametags.",
         setup(api) {
             const config = api.pluginConfig as NametagConfig;
@@ -201,6 +210,8 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 state.schedule(async () => {
                     try {
                         await job();
+                    } catch (error) {
+                        api.log.debug(`${key} update failed: ${error}`); // something bro idk
                     } finally {
                         state.pending.delete(key);
                         if (state.dirty.delete(key)) run(state, key, job);
@@ -227,6 +238,9 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         });
                         state.tabByName.set(entry.name.toLowerCase(), uuid);
                         queueTab(session, state, uuid);
+                        // the team can arrive before the entry it names
+                        const teamName = state.memberTeam.get(entry.name.toLowerCase());
+                        if (teamName) queueTeam(session, state, teamName);
                     } else if (action === "remove_player") {
                         const known = state.tab.get(uuid);
                         if (known) {
@@ -236,7 +250,13 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                             state.tabByName.delete(known.name.toLowerCase());
                             state.tagCache.delete(known.name.toLowerCase());
                         }
+                        const wasOverCap = state.tab.size > maxTab;
                         state.tab.delete(uuid);
+                        // a hub emptying out back under the cap means everyone we
+                        // skipped on the way up is now worth decorating
+                        if (wasOverCap && state.tab.size <= maxTab) {
+                            for (const id of state.tab.keys()) queueTab(session, state, id);
+                        }
                     } else if (action === "update_display_name") {
                         const known = state.tab.get(uuid);
                         if (!known) continue;
@@ -264,10 +284,13 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
 
             function queueTab(session: Session, state: SessionState, uuid: string): void {
                 if (!doTablist) return;
-                if (state.tab.size > maxTab) return; // hub sized list, skip it
                 const entry = state.tab.get(uuid);
                 // skip invalid entries, npcs, whatever
                 if (!entry || !/^[A-Za-z0-9_]{1,16}$/.test(entry.name)) return;
+                // hub sized list, not worth the lookups. anyone already decorated
+                // still gets maintained, else the servers next display name update
+                // wins and their tags vanish mid session
+                if (state.tab.size > maxTab && !entry.applied) return;
 
                 run(state, `tab:${uuid}`, async () => {
                     const before = state.tab.get(uuid);
@@ -291,21 +314,52 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 });
             }
 
+            // memberTeam holds one team per player, and hypixel adds a player to
+            // their new team before removing them from the old one. dropping the
+            // mapping blind lets that stale removal erase the new team, so only
+            // let go when it still points at the team doing the letting go
+            function unlinkMember(state: SessionState, member: string, teamName: string): void {
+                const key = member.toLowerCase();
+                if (state.memberTeam.get(key) === teamName) state.memberTeam.delete(key);
+            }
+
+            function refreshTabs(session: Session, state: SessionState, names: Iterable<string>): void {
+                for (const name of names) {
+                    const uuid = state.tabByName.get(name.toLowerCase());
+                    if (uuid) queueTab(session, state, uuid);
+                }
+            }
+
             // above header nametags are driven by "hacking" the minecraft teams system, which is why we need to track the teams and their members
             function handleTeam(data: any, session: Session): void {
                 const state = stateFor(session.id);
                 const teamName: string = data.team;
                 const mode: number = data.mode;
 
+                const touched = new Set<string>(); // names that need their tablist refreshed after this team change
+
                 if (mode === 1) {
                     const gone = state.teams.get(teamName);
-                    if (gone) for (const member of gone.players) state.memberTeam.delete(member.toLowerCase());
+                    if (gone) {
+                        for (const member of gone.players) {
+                            unlinkMember(state, member, teamName);
+                            touched.add(member);
+                        }
+                    }
                     state.teams.delete(teamName);
+                    refreshTabs(session, state, touched);
                     return;
                 }
 
                 let info = state.teams.get(teamName);
                 if (mode === 0) {
+                    // hypixel reuses team names across games, so whoever was under this name before is gone
+                    if (info) {
+                        for (const member of info.players) {
+                            unlinkMember(state, member, teamName);
+                            touched.add(member);
+                        }
+                    }
                     info = {
                         complete: true,
                         name: data.name ?? "",
@@ -317,7 +371,10 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         players: new Set<string>(data.players ?? []),
                     };
                     state.teams.set(teamName, info);
-                    for (const member of info.players) state.memberTeam.set(member.toLowerCase(), teamName);
+                    for (const member of info.players) {
+                        state.memberTeam.set(member.toLowerCase(), teamName);
+                        touched.add(member);
+                    }
                 } else if (mode === 2 && info) {
                     // the server re-sent this teams own formatting, take it as our base
                     info.name = data.name ?? info.name;
@@ -332,21 +389,21 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     for (const member of data.players ?? []) {
                         info.players.add(member);
                         state.memberTeam.set(member.toLowerCase(), teamName);
+                        touched.add(member);
                     }
                 } else if (mode === 4 && info) {
                     for (const member of data.players ?? []) {
                         info.players.delete(member);
-                        state.memberTeam.delete(member.toLowerCase());
+                        unlinkMember(state, member, teamName);
+                        touched.add(member);
                     }
                 }
 
                 if (!info) return;
                 queueTeam(session, state, teamName);
                 // team formatting feeds tab list names too, so refresh those
-                for (const member of info.players) {
-                    const uuid = state.tabByName.get(member.toLowerCase());
-                    if (uuid) queueTab(session, state, uuid);
-                }
+                for (const member of info.players) touched.add(member);
+                refreshTabs(session, state, touched);
             }
 
             function sendTeam(session: Session, teamName: string, info: TeamInfo, prefix: string, suffix: string): void {
@@ -406,19 +463,19 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     // cap leaves no room for both, but we put back the color that
                     // governed the name so the name itself looks untouched
                     const render = rendererFor(state.games.game);
-                    let prefix = current.serverPrefix;
-                    const ours = render.prefix(tags);
-                    if (ours) {
-                        const nameColor =
-                            lastColor(current.serverPrefix) ??
-                            (current.color >= 0 && current.color <= 15
-                                ? colorFromCode(current.color.toString(16))
-                                : undefined);
-                        const candidate = ours + (nameColor ? COLOR_CODES[nameColor] : "");
-                        if (candidate.length <= MAX_TEAM_FIELD) prefix = candidate;
-                    }
+                    const nameColor =
+                        lastColor(current.serverPrefix) ??
+                        (current.color >= 0 && current.color <= 15
+                            ? colorFromCode(current.color.toString(16))
+                            : undefined);
+                    const tail = nameColor ? COLOR_CODES[nameColor] : "";
+                    // budget the color back in up front so a prefix that doesnt fit
+                    // sheds its lowest priority tag instead of dropping out whole
+                    const ours = render.prefix(tags, MAX_TEAM_FIELD - tail.length);
+                    const prefix = ours ? ours + tail : current.serverPrefix;
                     const suffix =
-                        current.serverSuffix + render.suffix(tags, MAX_TEAM_FIELD - current.serverSuffix.length);
+                        current.serverSuffix +
+                        render.suffix(tags, Math.max(0, MAX_TEAM_FIELD - current.serverSuffix.length));
 
                     if (current.applied?.prefix === prefix && current.applied?.suffix === suffix) return;
                     current.applied = { prefix, suffix };
