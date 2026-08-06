@@ -36,14 +36,26 @@ export type PlayerFetch =
 | { status: "ratelimited" } // Rate limited by Hypixel API
 | { status: "error", cause?: string } // Other errors
 
+
+const ESSENTIAL_RESERVE = 20; // ratelimit to leave 
+const BLIND_BACKOFF_MS = 60_000;
+const TRANSIENT_TTL_MS = 10_000;
+const BAD_KEY_TTL_MS = 300_000;
+
 export class HypixelService {
     private cache = new Map<string, { expires: number; result: PlayerFetch }>();
+    // one request per player at a time
+    private inflight = new Map<string, Promise<PlayerFetch>>();
+    private limitedUntil = 0; // nothing goes out before this
+    private windowResetAt = 0; // when the quota rolls over, per RateLimit-Reset
+    private remaining = Infinity; // what the last response said was left
 
 
     constructor(private http: HttpClient, private readonly apiKey: string, private readonly ttl = 300_000) {}
     get enabled(): boolean { return this.apiKey.length > 0; }
 
-    async fetchPlayer(player: PlayerRef): Promise<PlayerFetch> {
+
+    async fetchPlayer(player: PlayerRef, options: { essential?: boolean } = {}): Promise<PlayerFetch> {
         if (!this.enabled) return { status: "no_key" };
         const dashed = player.uuid ? dashUuid(player.uuid) : undefined;
         if (!dashed) return { status: "unresolved" };
@@ -51,23 +63,71 @@ export class HypixelService {
         const cached = this.cache.get(cacheKey);
         if (cached && cached.expires > Date.now()) return cached.result;
 
+        const pending = this.inflight.get(cacheKey);
+        if (pending) return pending;
+
+        if (this.throttled(options.essential)) return { status: "ratelimited" };
+
+        const request = this.request(dashed, cacheKey).finally(() => this.inflight.delete(cacheKey));
+        this.inflight.set(cacheKey, request);
+        return request;
+    }
+
+    private throttled(essential = false): boolean {
+        if (Date.now() < this.limitedUntil) return true;
+        if (Date.now() >= this.windowResetAt) return false; // quota rolled over
+        return !essential && this.remaining <= ESSENTIAL_RESERVE;
+    }
+
+    private async request(dashed: string, cacheKey: string): Promise<PlayerFetch> {
         const res = await this.http.send<HypixelResponse>(
             `https://api.hypixel.net/player?uuid=${dashed}`,
-            "GET", 
+            "GET",
             { headers: { "API-Key": this.apiKey }, timeout: 5000 }
         );
+        this.readLimits(res.headers, res.status);
+
         let result: PlayerFetch;
         if (res.status === 403) result = { status: "invalid_key" };
         else if (res.status === 429) result = { status: "ratelimited" };
-        else if (!res.ok || !res.data) result = { status: "error", cause: "No response data" };
+        else if (!res.ok || !res.data) result = { status: "error", cause: `HTTP ${res.status}` };
         else if (!res.data.success) result = { status: "error", cause: res.data.cause };
-        else if (res.data?.success && res.data.player) result = { status: "ok", player: res.data.player };
+        else if (res.data.player) result = { status: "ok", player: res.data.player };
         else result = { status: "no_data" };
 
-        const cacheMs = (result.status === "ok" ? this.ttl : 10_000);
-        this.cache.set(cacheKey, { expires: Date.now() + cacheMs, result });
+        this.cache.set(cacheKey, { expires: Date.now() + this.cacheMsFor(result), result });
         return result;
+    }
 
+    private readLimits(headers: Record<string, string>, status: number): void {
+        // read the ratelimit headers and update our state
+        const num = (key: string): number | undefined => {
+            const value = Number(headers[key]);
+            return headers[key] !== undefined && Number.isFinite(value) ? value : undefined;
+        };
+        const reset = num("ratelimit-reset");
+        const remaining = num("ratelimit-remaining");
+        if (reset !== undefined) this.windowResetAt = Date.now() + Math.max(0, reset) * 1000;
+        if (remaining !== undefined) this.remaining = remaining;
+        if (status !== 429) return;
+
+        const wait = num("retry-after") ?? reset;
+        this.limitedUntil = Date.now() + (wait !== undefined ? Math.max(1, wait) * 1000 : BLIND_BACKOFF_MS);
+        this.remaining = 0;
+    }
+
+    private cacheMsFor(result: PlayerFetch): number {
+        switch (result.status) {
+            case "ok":
+            case "no_data": // a real answer, this player has never touched hypixel
+                return this.ttl;
+            case "invalid_key": // no point asking again every few seconds with a bad key
+                return BAD_KEY_TTL_MS;
+            case "ratelimited":
+                return Math.max(TRANSIENT_TTL_MS, this.limitedUntil - Date.now());
+            default:
+                return TRANSIENT_TTL_MS;
+        }
     }
 }
 

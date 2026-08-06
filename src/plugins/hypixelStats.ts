@@ -62,8 +62,10 @@ export const hypixelStatsPlugin: Plugin = {
             return uuid ? { ...player, uuid } : player;
         };
 
-        const fetch = async (player: PlayerRef) => {
-            const result = await hypixel.fetchPlayer(await withUuid(player));
+        // essential means somebody typed a command for this one, so it may spend the
+        // slice of the ratelimit window that background decoration is kept out of
+        const fetch = async (player: PlayerRef, options: { essential?: boolean } = {}) => {
+            const result = await hypixel.fetchPlayer(await withUuid(player), options);
             if (result.status === "invalid_key" && !warnedInvalidKey) {
                 warnedInvalidKey = true;
                 api.log.warn("Hypixel API key is invalid, stats stay off until its fixed (developer.hypixel.net)");
@@ -212,7 +214,7 @@ export const hypixelStatsPlugin: Plugin = {
             const target: PlayerRef = args[0]
                 ? (session.findPlayer(args[0]) ?? { name: args[0] })
                 : { name: session.username };
-            const result = await fetch(target);
+            const result = await fetch(target, { essential: true });
             if (result.status !== "ok") {
                 session.chat.text(`${PREFIX} §c${fetchErrorMessage(result.status)} §7(${target.name})`);
                 return null;
