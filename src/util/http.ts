@@ -80,17 +80,17 @@ export class HttpClient {
     }
 
     async send<T = unknown>(
-        url: string, 
-        method: "GET" | "POST" | "PUT" | "DELETE",  
+        url: string,
+        method: "GET" | "POST" | "PUT" | "DELETE",
         options: {
             headers?: Record<string, string>;
             json?: unknown;
             form?: Record<string, string>;
             timeout?: number;
-        } = {}): Promise<{ ok: boolean, status: number, data: T | null }> 
+        } = {}): Promise<{ ok: boolean, status: number, data: T | null, headers: Record<string, string> }>
     {
         const controller = new AbortController();
-        const timeout = options.timeout ?? 5000;
+        const timer = setTimeout(() => controller.abort(), options.timeout ?? 5000);
         try {
             const headers: Record<string, string> = {
                 "user-agent": this.userAgent,
@@ -112,14 +112,25 @@ export class HttpClient {
                 body,
                 signal: controller.signal
             });
-            const data = await result.json() as T;
-            return { ok: result.ok, status: result.status, data };
+            const seen: Record<string, string> = {};
+            result.headers.forEach((value, key) => { seen[key.toLowerCase()] = value; });
+
+            const raw = await result.text();
+            let data: T | null = null;
+            if (raw) {
+                try {
+                    data = JSON.parse(raw) as T;
+                } catch {
+                    this.log.debug(`HTTP ${method} ${url} returned ${result.status} with a non-JSON body`); // ratelimit stuff
+                }
+            }
+            return { ok: result.ok, status: result.status, data, headers: seen };
         } catch (error) {
             this.log.error(`HTTP ${method} ${url} failed: ${error}`);
-            return { ok: false, status: 0, data: null };
+            return { ok: false, status: 0, data: null, headers: {} };
         }
         finally {
-            clearTimeout(timeout);
+            clearTimeout(timer);
         }
     }
 
