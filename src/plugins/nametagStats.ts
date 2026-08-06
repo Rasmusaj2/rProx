@@ -4,7 +4,7 @@ import { actionName } from "../core/lobby";
 import { componentToLegacy } from "../core/chat";
 import { GameTracker, tagsForGame, type GameMode } from "../core/game";
 import { dashUuid } from "../services/microsoft";
-import { COLOR_CODES, colorFromCode, lastColor } from "../util/mcColors";
+import { COLOR_CODES, colorFromCode, lastColor, stripColorCodes } from "../util/mcColors";
 
 interface NametagConfig {
     enabled?: boolean;
@@ -47,6 +47,7 @@ interface SessionState {
     tab: Map<string, TabEntry>; // uuid -> entry
     tabByName: Map<string, string>; // lowercase name -> uuid
     tagCache: Map<string, CacheEntry>;
+    npcs: Set<string>; // lowercase names hypixel handed an [NPC] rank
     failures: Map<string, number>; // lowercase name -> lookups in a row that came back failed
     retries: Map<string, NodeJS.Timeout>; // job key -> pending second attempt
     joined: Set<string>; // lowercase names that joined after us, never capped
@@ -143,6 +144,12 @@ function hasColorCode(str: string): boolean {
     return /§[0-9a-f]/i.test(str);
 }
 
+// lobbby npcs are a waste to look up, hypixel marks them with npc rank
+const NPC_RANK = /\[npc\]/i;
+function hasNpcRank(text: string | undefined): boolean {
+    return !!text && NPC_RANK.test(stripColorCodes(text));
+}
+
 // queue with a ceiling on how many jobs run at once
 function limiter(max: number): (fn: () => Promise<void>) => void {
     let active = 0;
@@ -187,6 +194,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         tab: new Map(),
                         tabByName: new Map(),
                         tagCache: new Map(),
+                        npcs: new Set(),
                         failures: new Map(),
                         retries: new Map(),
                         joined: new Set(),
@@ -208,6 +216,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 state.memberTeam.clear();
                 state.tab.clear();
                 state.tabByName.clear();
+                state.npcs.clear();
                 state.pending.clear();
                 state.dirty.clear();
                 for (const timer of state.retries.values()) clearTimeout(timer);
@@ -253,6 +262,20 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 api.log.info(`game is now ${session.game}`);
                 for (const uuid of state.tab.keys()) queueTab(session, state, uuid);
                 for (const teamName of state.teams.keys()) queueTeam(session, state, teamName);
+            }
+
+            // an npc stays an npc for as long as this server keeps it around, so
+            // remember the ones we spot to avoid wasting lookups on them
+            function markNpc(state: SessionState, name: string): void {
+                const key = name.toLowerCase();
+                if (state.npcs.has(key)) return;
+                state.npcs.add(key);
+                state.tagCache.delete(key);
+                api.log.debug(`skipping ${name}, [NPC] rank`);
+            }
+
+            function isNpc(state: SessionState, name: string): boolean {
+                return state.npcs.has(name.toLowerCase());
             }
 
             // a players tags, cached per name for this session. the entry is stored
@@ -336,11 +359,10 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
 
                     if (action === "add_player") {
                         if (!entry.name) continue;
-                        state.tab.set(uuid, {
-                            name: entry.name,
-                            serverDisplay: entry.displayName ? componentToLegacy(version, entry.displayName) : undefined,
-                        });
+                        const serverDisplay = entry.displayName ? componentToLegacy(version, entry.displayName) : undefined;
+                        state.tab.set(uuid, { name: entry.name, serverDisplay });
                         state.tabByName.set(entry.name.toLowerCase(), uuid);
+                        if (hasNpcRank(serverDisplay)) markNpc(state, entry.name);
                         if (!dump) state.joined.add(entry.name.toLowerCase());
                         queued.add(uuid);
                         // the team can arrive before the entry it names
@@ -355,6 +377,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                             state.tabByName.delete(known.name.toLowerCase());
                             state.tagCache.delete(known.name.toLowerCase());
                             state.joined.delete(known.name.toLowerCase());
+                            state.npcs.delete(known.name.toLowerCase());
                         }
                         state.tab.delete(uuid);
                         freed = true;
@@ -364,6 +387,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         const incoming = entry.displayName ? componentToLegacy(version, entry.displayName) : undefined;
                         if (incoming !== known.applied) { // ignore the echo of our own value
                             known.serverDisplay = incoming;
+                            if (hasNpcRank(incoming)) markNpc(state, known.name);
                             queued.add(uuid);
                         }
                     }
@@ -420,11 +444,14 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 // skip invalid entries, npcs, and hypixels fake "Tokens: ..." style
                 // tab rows, none of which should cost a lookup
                 if (!entry || !/^[A-Za-z0-9_]{1,16}$/.test(entry.name)) return;
+                if (isNpc(state, entry.name)) return;
 
                 const key = `tab:${uuid}`;
                 run(state, key, async () => {
                     const before = state.tab.get(uuid);
                     if (!before) return;
+                    // the team carrying the [NPC] mark can land while we sat in the queue
+                    if (isNpc(state, before.name)) return;
                     if (!affordLookup(state, before.name)) return;
                     const { tags, failed } = await tagsFor(state, { name: before.name, uuid });
 
@@ -552,6 +579,12 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     }
                 }
 
+                // hypixel hangs the [NPC] rank off the team holding the nametag, so
+                // this is usually where a lobby npc gives itself away
+                if (info && (hasNpcRank(info.serverPrefix) || hasNpcRank(info.serverSuffix))) {
+                    for (const member of info.players) markNpc(state, member);
+                }
+
                 if (info) {
                     queueTeam(session, state, teamName);
                     // team formatting feeds tab list names too, so refresh those
@@ -585,7 +618,9 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
 
             function queueTeam(session: Session, state: SessionState, teamName: string): void {
                 if (!doAboveHead) return;
-                if (!state.teams.get(teamName)?.complete) return;
+                const team = state.teams.get(teamName);
+                if (!team?.complete) return;
+                if (hasNpcRank(team.serverPrefix) || hasNpcRank(team.serverSuffix)) return;
 
                 const key = `team:${teamName}`;
                 run(state, key, async () => {
@@ -603,6 +638,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         revertTeam(session, teamName, info);
                         return;
                     }
+                    if (isNpc(state, player.name)) return;
                     // the same budget the tab list draws on. a lookup is a lookup
                     // whichever decoration ends up consuming it
                     if (!affordLookup(state, player.name)) return;
