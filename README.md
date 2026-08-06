@@ -103,7 +103,7 @@ Counts what you catch while lobby fishing and puts the session totals on the sid
     "maxSidebarLines": 15 // rows your client actually renders. raise it if yours draws more than vanilla, and none of Hypixels rows get hidden
 }
 ```
-***antiAfk**
+* **antiAfk**
 
 Prevents you from being afk-kicked in lobbies
 
