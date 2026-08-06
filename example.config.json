@@ -37,6 +37,20 @@
             "prefer": [],
             "timeoutMs": 10000
         },
+        "lobbyFishing": {
+            "enabled": true,
+            "sidebar": true,
+            "maxSidebarLines": 15,
+            "colors": {
+                "total": "green",
+                "fish": "yellow",
+                "plant": "dark_green",
+                "mythical": "gold",
+                "treasure": "aqua",
+                "junk": "gray",
+                "creature": "light_purple"
+            }
+        },
         "antiAfk": {
             "enabled": false,
             "intervalSeconds": 150,

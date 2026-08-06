@@ -49,9 +49,11 @@ After this rProx will be running on localhost:25565
 
 `//afk [on|off]` - Toggle anti-afk, which DMs you a random string every `intervalSeconds` and hides the To/From echo
 
+`//catches [reset]` - Full breakdown of what you have fished in this session, per category and per hour
+
 ### Core Plugin Configuration
 
-rProx comes with 5 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk & a daily reward handler
+rProx comes with 6 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing & a daily reward handler
 
 Configuration for these are set in [`config.json`](config.json) section called `builtInPlugins` - This section also works for configuration for external plugins, but the tooling for this is uncomplete.
 
@@ -90,7 +92,18 @@ Automatically claims daily reward links in chat
     "timeoutMs": 10000
 }
 ```
-* **antiAfk**
+* **lobbyFishing**
+
+Counts what you catch while lobby fishing and puts the session totals on the sidebar, underneath Hypixels own fishing lines
+
+```json
+"lobbyFishing": {
+    "enabled": true,
+    "sidebar": true, // false counts catches for //catches without touching the sidebar
+    "maxSidebarLines": 15 // rows your client actually renders. raise it if yours draws more than vanilla, and none of Hypixels rows get hidden
+}
+```
+***antiAfk**
 
 Prevents you from being afk-kicked in lobbies
 
