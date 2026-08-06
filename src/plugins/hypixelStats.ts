@@ -12,6 +12,7 @@ import {
     fetchErrorMessage,
     MYTHICAL_FANCY_NAMES,
     type HypixelPlayer,
+    type PlayerFetch,
 } from "../services/hypixel";
 import { formatStar, starText, starColor, formatFkdr, fkdrColor } from "../services/bedwars";
 import * as sw from "../services/skywars";
@@ -34,6 +35,9 @@ interface HypixelStatsConfig {
 }
 
 const c = (color: McColorName, value: string | number) => COLOR_CODES[color] + value;
+
+// enrichment changes retryable array 
+const RETRYABLE: ReadonlyArray<PlayerFetch["status"]> = ["ratelimited", "error", "unresolved"];
 
 export const hypixelStatsPlugin: Plugin = {
     name: "hypixelStats",
@@ -186,7 +190,10 @@ export const hypixelStatsPlugin: Plugin = {
             name: "hypixelStats",
             async enrich(player) {
                 const result = await fetch(player);
-                if (result.status !== "ok") return null;
+                if (result.status !== "ok") {
+                    if (RETRYABLE.includes(result.status)) throw new Error(fetchErrorMessage(result.status));
+                    return null;
+                }
                 return [...bedwarsTags(result.player), 
                     ...skywarsTags(result.player), 
                     ...duelsTags(result.player), 

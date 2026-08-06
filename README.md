@@ -75,7 +75,7 @@ Shows player statistics in the tab menu or above their playerhead in lobbies & g
     "enabled": true,
     "aboveHead": true, // show stats above the players head
     "tablist": true, // show stats in the tablist
-    "maxTablistPlayers": 32, // max amount of people to check at once
+    "maxTablistPlayers": 32, // player list size above which we stop looking anyone new up, tablist and above-head alike. raise it to cover big hubs, at the cost of the API ratelimit
     "cacheTtlSeconds": 120
 } // NOTE: API Key here leeches from hypixelStats
 ```
