@@ -9,6 +9,12 @@ import type { DetectSource, Enricher, PlayerRef, Session, Tag } from "./types";
 // idk this was confusing even for myself and i wrote it
 const log = createLogger("enrich");
 
+// what a round of enrichers returned, shows the failed status incase of an error to allow the caller to decide if they want a retry
+export interface Collected {
+    tags: Tag[];
+    failed: boolean;
+}
+
 // run tasks with a ceiling on how many are in flight
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
     const results: R[] = new Array(items.length);
@@ -55,19 +61,25 @@ export class EnrichmentEngine {
     }
 
     // run every enricher for one player and merge what they hand back
-    async collect(player: PlayerRef, source: DetectSource): Promise<Tag[]> {
+    async collectDetailed(player: PlayerRef, source: DetectSource): Promise<Collected> {
         const ctx = { http: this.http, log, config: this.config, source };
+        let failed = false;
         const perEnricher = await Promise.all(
             this.enrichers.map(async (enricher) => {
                 try {
                     return (await enricher.enrich(player, ctx)) ?? [];
                 } catch (error) {
+                    failed = true;
                     log.debug(`enricher "${enricher.name}" failed for ${player.name}: ${error}`);
                     return [];
                 }
             }),
         );
-        return perEnricher.flat();
+        return { tags: perEnricher.flat(), failed };
+    }
+
+    async collect(player: PlayerRef, source: DetectSource): Promise<Tag[]> {
+        return (await this.collectDetailed(player, source)).tags;
     }
 
     // check one player and put a line in chat if theres anything worth showing
