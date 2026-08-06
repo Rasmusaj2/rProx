@@ -105,28 +105,30 @@ export function totalCatches(totals: CatchTotals): number {
     return CATCH_KINDS.reduce((sum, kind) => sum + totals[kind], 0);
 }
 
-// IDK WHAT THIS DOES
+
+const CODE = String.raw`(?:§[0-9a-fk-or])*`; // color codes regex for plant detection (well every kind of but plant)
+
+// regex builder for the plant/creature/fish catches, which are all color coded and don't have a weight
+const caught = (color: string, item = String.raw`[^\d].+?`) =>
+    new RegExp(String.raw`^${CODE}You caught(?: an?)? ${CODE}§${color}(${item})${CODE}§7!`, "i");
+
 const MYTHICAL_ITEM = new RegExp(
-    String.raw`(?:([\d.,]+)\s*kg\s+)?(${Object.values(MYTHICAL_FANCY_NAMES).join("|")})\b`,
+    String.raw`(?:([\d.,]+)\s*kg\s*${CODE}\s*)?${CODE}(${Object.values(MYTHICAL_FANCY_NAMES).join("|")})\b`,
     "i",
 );
 
-// first match wins, so more specific patterns first (ie. plants)
+// first match wins, no longer needed that much since we do color codes for most of the matching now instead of using item names for plants as before
+// anyways these new regex patterns are stolen from sharkeys fishing utils (kind of). idk how to give proper credit
 const CATCH_PATTERNS = new Map<RegExp, CatchKind>([
-    [/^oh no[,.!]*\s*(?:you\s+(?:caught|reeled\s+in)|that'?s)\b.*$/i, "junk"],
-    [/^you caught .+?,?\s*(?:and\s+)?that'?s\s+(?:an?\s+|some\s+)?junk\b/i, "junk"],
-    [/^you caught .+?,?\s*(?:and\s+)?that'?s\s+(?:an?\s+|some\s+)?treasures?\b/i, "treasure"],
-    // idk the plant stuff, taken from derpythenon screenshot somewhere - I ASSUME THESE ARE LAVA FISHING PLANTS ONLY
-    [/^you caught a baked potato!/i, "plant"],
-    [/^you caught dried kelp!/i, "plant"],
-    [/^you caught warped roots!/i, "plant"],
-    [/^you caught charred berries!/i, "plant"],
-    [/^you caught netherwart!/i, "plant"],
-    // TODO - Add more plant (water + ice(?)) and need creature regexes too
-    [/^you caught .+?,?\s*(?:and\s+)?that'?s\s+(?:an?\s+|some\s+)?mythicals?\b/i, "mythical"],
-    [/^you caught .+?,?\s*(?:and\s+)?that'?s\s+(?:an?\s+|some\s+)?fish\b/i, "fish"],
-    [MYTHICAL_ITEM, "mythical"],
-    [/^you caught (?:an?\s+|some\s+|the\s+)?.+?[!.]*$/i, "fish"],
+    [new RegExp(String.raw`^${CODE}Oh no, you caught(?: an?)? ${CODE}§c(.+?)${CODE}§7!`, "i"), "junk"],
+    [new RegExp(String.raw`^${CODE}You caught(?: an?)? ${CODE}§a(.+?)${CODE}§7, that'?s a treasure!`, "i"), "treasure"],
+    [new RegExp(String.raw`^${CODE}You caught a ${CODE}§f(\d+)kg ${CODE}§\w(.*?)${CODE}§7!`, "i"), "mythical"],
+    [new RegExp(String.raw`^${CODE}You caught ${CODE}§\w(\d{1,3} .+?)${CODE}§7!`, "i"), "treasure"],
+    // the color is the whole rule, so this holds for every plant and creature
+    // there is without anybody having to know the names of them
+    [caught("2"), "plant"],
+    [caught("b"), "creature"],
+    [caught("e"), "fish"],
 ]);
 
 const ORB_BY_NAME = new Map(
@@ -139,9 +141,9 @@ export interface Catch {
     weight?: number; // kg, mythicals are the only catch that rolls one
 }
 
-// null for any line that is not a catch, colors already stripped
-export function parseCatch(text: string): Catch | null {
-    const line = text.trim();
+// null for any line that is not a catch. colors no longer stripped
+export function parseCatch(formatted: string): Catch | null {
+    const line = formatted.trim();
     for (const [pattern, kind] of CATCH_PATTERNS) {
         if (!pattern.test(line)) continue;
         if (kind !== "mythical") return { kind };
