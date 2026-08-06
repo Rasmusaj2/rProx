@@ -1,7 +1,7 @@
 import type { Collected, EnrichmentEngine } from "../core/enrichment";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
 import { actionName } from "../core/lobby";
-import { componentToLegacy } from "../core/chat";
+import { componentToLegacy, PREFIX } from "../core/chat";
 import { GameTracker, tagsForGame, type GameMode } from "../core/game";
 import { dashUuid } from "../services/microsoft";
 import { COLOR_CODES, colorFromCode, lastColor } from "../util/mcColors";
@@ -49,6 +49,7 @@ interface SessionState {
     tagCache: Map<string, CacheEntry>;
     failures: Map<string, number>; // lowercase name -> lookups in a row that came back failed
     retries: Map<string, NodeJS.Timeout>; // job key -> pending second attempt
+    lookups: number; // fresh api lookups spent on this server, capped by maxTablistPlayers
     pending: Set<string>;
     dirty: Set<string>;
     games: GameTracker;
@@ -183,6 +184,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         tagCache: new Map(),
                         failures: new Map(),
                         retries: new Map(),
+                        lookups: 0,
                         pending: new Set(),
                         dirty: new Set(),
                         games: new GameTracker(),
@@ -204,6 +206,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 state.dirty.clear();
                 for (const timer of state.retries.values()) clearTimeout(timer);
                 state.retries.clear();
+                state.lookups = 0; // new server, new budget
                 state.games.clear();
             };
 
@@ -253,6 +256,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 const hit = state.tagCache.get(key);
                 if (hit && hit.expires > Date.now()) return hit.lookup;
 
+                state.lookups++;
                 const entry: CacheEntry = { expires: Infinity, lookup: Promise.resolve({ tags: [], failed: true }) };
                 const settle = (result: Collected): Collected => {
                     entry.expires = Date.now() + (result.failed ? FAILED_TTL_MS : ttl);
@@ -339,13 +343,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                             state.tabByName.delete(known.name.toLowerCase());
                             state.tagCache.delete(known.name.toLowerCase());
                         }
-                        const wasOverCap = state.tab.size > maxTab;
                         state.tab.delete(uuid);
-                        // a hub emptying out back under the cap means everyone we
-                        // skipped on the way up is now worth decorating
-                        if (wasOverCap && state.tab.size <= maxTab) {
-                            for (const id of state.tab.keys()) queued.add(id);
-                        }
                     } else if (action === "update_display_name") {
                         const known = state.tab.get(uuid);
                         if (!known) continue;
@@ -375,24 +373,29 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 return `${team.serverPrefix}${color}${entry.name}${team.serverSuffix}`;
             }
 
-            // a hub sized player list is not worth the lookups, and spending the rate
-            // limit there is what leaves the game you actually came for without any
-            // stats at all. anything already decorated keeps being maintained, else
-            // the servers next update wins and those tags vanish mid session
-            const overCap = (state: SessionState, applied: unknown): boolean =>
-                state.tab.size > maxTab && !applied;
+            // maxTablistPlayers is a budget of api lookups per server, not a switch
+            // that turns the whole list off once its big. a lobby of 90 spends 80 and
+            // decorates those 80, rather than deciding 90 is too many and decorating
+            // nobody. reading a name back out of the cache is free, so refreshing
+            // someone we already know never eats into it
+            function affordLookup(state: SessionState, name: string): boolean {
+                const hit = state.tagCache.get(name.toLowerCase());
+                if (hit && hit.expires > Date.now()) return true;
+                return state.lookups < maxTab;
+            }
 
             function queueTab(session: Session, state: SessionState, uuid: string): void {
                 if (!doTablist) return;
                 const entry = state.tab.get(uuid);
-                // skip invalid entries, npcs, whatever
+                // skip invalid entries, npcs, and hypixels fake "Tokens: ..." style
+                // tab rows, none of which should cost a lookup
                 if (!entry || !/^[A-Za-z0-9_]{1,16}$/.test(entry.name)) return;
-                if (overCap(state, entry.applied)) return;
 
                 const key = `tab:${uuid}`;
                 run(state, key, async () => {
                     const before = state.tab.get(uuid);
                     if (!before) return;
+                    if (!affordLookup(state, before.name)) return;
                     const { tags, failed } = await tagsFor(state, { name: before.name, uuid });
 
                     const current = state.tab.get(uuid);
@@ -570,9 +573,9 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         revertTeam(session, teamName, info);
                         return;
                     }
-                    // the same lookup ceiling the tab list uses. a lookup is a lookup
+                    // the same budget the tab list draws on. a lookup is a lookup
                     // whichever decoration ends up consuming it
-                    if (overCap(state, info.applied)) return;
+                    if (!affordLookup(state, player.name)) return;
 
                     const { tags, failed } = await tagsFor(state, player);
 
