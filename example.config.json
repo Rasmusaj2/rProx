@@ -41,6 +41,8 @@
             "enabled": true,
             "sidebar": true,
             "maxSidebarLines": 15,
+            "spacer": true,
+            "hideRows": ["hypixel level"],
             "colors": {
                 "total": "green",
                 "fish": "yellow",

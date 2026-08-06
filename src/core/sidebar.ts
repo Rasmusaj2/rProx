@@ -1,5 +1,7 @@
 // scoreboard row enricher
 // used to inject custom values and data into the sidebar, which hypixel keeps re-sending its own rows for every time its updated 
+import { stripColorCodes } from "../util/mcColors";
+
 const MAX_ENTRY = 48; // 48 char limit per line
 export const SIDEBAR_LINES = 15; // 15 rows limit 16th is title "HYPIXEL"
 const SIDEBAR = 1;
@@ -25,6 +27,20 @@ interface ScorePacket {
     value?: number;
 }
 
+interface TeamPacket {
+    team: string;
+    mode: number; // 0 create, 1 remove, 2 update, 3 add members, 4 remove members
+    prefix?: string;
+    suffix?: string;
+    players?: string[];
+}
+
+interface TeamInfo {
+    prefix: string;
+    suffix: string;
+    players: Set<string>;
+}
+
 type Send = (name: string, data: unknown) => void;
 
 type Scores = Map<string, number>; // holder -> score
@@ -48,6 +64,9 @@ export class SidebarInjector {
     private client = new Map<string, Scores>(); // scores the client is actually holding, ours included
     private display?: string; // objective in the sidebar slot
     private lines: string[] = []; // what we want at the bottom of it, top row first
+    private omitted: RegExp[] = []; // hypixel rows we would rather have the space of (ie. deleted lines)
+    private teams = new Map<string, TeamInfo>();
+    private holderTeam = new Map<string, string>(); // score holder -> team name
 
     constructor(private readonly maxLines: number = SIDEBAR_LINES) {}
 
@@ -98,17 +117,86 @@ export class SidebarInjector {
         scoresFor(this.client, scoreName).set(itemName, value);
     }
 
+    applyTeam(packet: TeamPacket): void {
+        const { team, mode } = packet;
+        if (mode === 1) {
+            for (const member of this.teams.get(team)?.players ?? []) this.unlink(member, team);
+            this.teams.delete(team);
+            return;
+        }
+        if (mode === 4) {
+            const info = this.teams.get(team);
+            for (const member of packet.players ?? []) {
+                info?.players.delete(member);
+                this.unlink(member, team);
+            }
+            return;
+        }
+
+        // 0 creates with members, 2 re-sends the formatting, 3 only adds members
+        let info = this.teams.get(team);
+        if (mode === 0 || !info) {
+            for (const member of info?.players ?? []) this.unlink(member, team);
+            info = { prefix: "", suffix: "", players: new Set() };
+            this.teams.set(team, info);
+        }
+        if (mode !== 3) {
+            info.prefix = packet.prefix ?? info.prefix;
+            info.suffix = packet.suffix ?? info.suffix;
+        }
+        for (const member of packet.players ?? []) {
+            info.players.add(member);
+            this.holderTeam.set(member, team);
+        }
+    }
+
+    // a holder moves teams by being added to the new one before the old one lets
+    // go, so only drop the mapping while it still points at the team dropping it
+    private unlink(member: string, team: string): void {
+        if (this.holderTeam.get(member) === team) this.holderTeam.delete(member);
+    }
+
     // clear scoreboard and accept hypixels on login packet (ie. lobby swap)
     clear(): void {
         this.titles.clear();
         this.server.clear();
         this.client.clear();
+        this.teams.clear();
+        this.holderTeam.clear();
         this.display = undefined;
     }
 
     // the rows we want, top first. an empty list gives hypixel its sidebar back
     set(lines: string[]): void {
         this.lines = lines;
+    }
+
+    // rows of hypixels own to drop, matched against the text with colors off.
+    // only ever applied while we have rows of our own to put there, a sidebar we
+    // are not drawing on has no business losing anything
+    omit(patterns: RegExp[]): void {
+        this.omitted = patterns;
+    }
+
+    // a row as the client draws it, team formatting and all
+    rowText(entry: string): string {
+        const team = this.holderTeam.get(entry);
+        const info = team ? this.teams.get(team) : undefined;
+        return info ? `${info.prefix}${entry}${info.suffix}` : entry;
+    }
+
+    // every row of the sidebar, top first. for logging what we are matching on
+    rows(): Array<{ entry: string; text: string; score: number }> {
+        const scores = this.display ? (this.server.get(this.display) ?? new Map()) : new Map();
+        return [...scores]
+            .sort((a, b) => b[1] - a[1])
+            .map(([entry, score]) => ({ entry, text: this.rowText(entry), score }));
+    }
+
+    private kept(entry: string): boolean {
+        if (!this.omitted.length) return true;
+        const text = stripColorCodes(this.rowText(entry));
+        return !this.omitted.some((pattern) => pattern.test(text));
     }
 
     // send whatever it takes to turn the clients scoreboard into what we want
@@ -143,10 +231,10 @@ export class SidebarInjector {
         if (objective !== this.display || this.lines.length === 0) return new Map(server);
 
         // ascending score, which is bottom to top on screen
-        const byScore = [...server].sort((a, b) => a[1] - b[1]);
+        const byScore = [...server].filter(([entry]) => this.kept(entry)).sort((a, b) => a[1] - b[1]);
         // never hide more of hypixels rows than we are putting back, so a
         // sidebar we cannot fit into ends up no less informative than it started
-        const overflow = server.size + this.lines.length - this.maxLines;
+        const overflow = byScore.length + this.lines.length - this.maxLines;
         const hidden = Math.max(0, Math.min(overflow, this.lines.length));
 
         const target = new Map(byScore.slice(hidden));

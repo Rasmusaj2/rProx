@@ -28,7 +28,13 @@ interface LobbyFishingConfig {
     sidebar?: boolean; // draw the session block under hypixels own fishing lines
     maxSidebarLines?: number; // rows the client will actually render, 15 on vanilla
     colors?: Partial<Record<RowKey, string>>; // per row number color, "gold" or "§6"
+    spacer?: boolean; // blank row between hypixels rows and our session row
+    hideRows?: string[]; // hypixel rows to drop for the room, matched colorless and case insensitively
 }
+
+// the level row is the one nobody reads twice, and dropping it pays for the
+// spacer so the block below still costs hypixel the same number of rows
+const DEFAULT_HIDDEN_ROWS = ["hypixel level"];
 
 const DEFAULT_COLORS: Record<RowKey, McColorName> = {
     total: "green",
@@ -51,6 +57,7 @@ interface SessionState {
     startedAt?: number; // starts at first catch
     sidebar: SidebarInjector;
     flush?: NodeJS.Immediate;
+    dumped?: boolean; // logged this lobbys rows already
 }
 
 // what goes on the sidebar, currently we can only do 3 lines because of 1.8 15 line limit for sidebars
@@ -74,7 +81,19 @@ export const lobbyFishingPlugin: Plugin = {
         const config = api.pluginConfig as LobbyFishingConfig;
         const useSidebar = config.sidebar !== false;
         const maxLines = Math.max(1, Math.floor(config.maxSidebarLines ?? SIDEBAR_LINES));
+        const useSpacer = config.spacer !== false;
         const sessions = new Map<string, SessionState>();
+
+        // a pattern the config got wrong would throw on every lobby, so build
+        // them once here and drop the ones that dont compile
+        const hidden: RegExp[] = [];
+        for (const source of config.hideRows ?? DEFAULT_HIDDEN_ROWS) {
+            try {
+                hidden.push(new RegExp(source, "i"));
+            } catch {
+                api.log.warn(`hideRows entry "${source}" is not a valid regex, ignoring it`);
+            }
+        }
 
         // resolved once, a color the config got wrong is worth saying out loud
         const colors = {} as Record<RowKey, string>;
@@ -88,7 +107,9 @@ export const lobbyFishingPlugin: Plugin = {
         const stateFor = (id: string): SessionState => {
             let state = sessions.get(id);
             if (!state) {
-                state = { totals: emptyTotals(), mythicals: {}, sidebar: new SidebarInjector(maxLines) };
+                const sidebar = new SidebarInjector(maxLines);
+                sidebar.omit(hidden);
+                state = { totals: emptyTotals(), mythicals: {}, sidebar };
                 sessions.set(id, state);
             }
             return state;
@@ -98,10 +119,12 @@ export const lobbyFishingPlugin: Plugin = {
 
         function sidebarLines(state: SessionState): string[] {
             const elapsed = elapsedOf(state);
-            return rowsFor(state.totals).map(
+            const rows = rowsFor(state.totals).map(
                 ([key, label, value]) =>
-                    `§eSession ${label}: ${colors[key]}${formatCount(value)} §8(§7${formatRate(value, elapsed)}/h§8)`,
+                    `§fSession ${label}: ${colors[key]}${formatCount(value)} §8(§7${formatRate(value, elapsed)}/h§8)`,
             );
+            // the blank sits above our block so hypixels rows dont run into ours.
+            return useSpacer ? [" ", ...rows] : rows;
         }
 
         const showable = (state: SessionState): boolean =>
@@ -113,7 +136,16 @@ export const lobbyFishingPlugin: Plugin = {
             if (state.flush) return;
             state.flush = setImmediate(() => {
                 state.flush = undefined;
-                state.sidebar.set(showable(state) ? sidebarLines(state) : []);
+                const drawing = showable(state);
+                // hideRows is only as good as the text it is matched against, so
+                // put that text in the log once per lobby to compare it to
+                if (drawing && !state.dumped) {
+                    state.dumped = true;
+                    for (const row of state.sidebar.rows()) {
+                        api.log.debug(`sidebar ${String(row.score).padStart(3)} ${JSON.stringify(row.text)}`); // lmao this prints emojis in consle
+                    }
+                }
+                state.sidebar.set(drawing ? sidebarLines(state) : []);
                 try {
                     state.sidebar.flush((name, data) => session.sendPacket(name, data));
                 } catch (error) {
@@ -128,10 +160,12 @@ export const lobbyFishingPlugin: Plugin = {
                 if (name === "scoreboard_objective") state.sidebar.applyObjective(data);
                 else if (name === "scoreboard_display_objective") state.sidebar.applyDisplayObjective(data);
                 else if (name === "scoreboard_score") state.sidebar.applyScore(data);
+                else if (name === "scoreboard_team") state.sidebar.applyTeam(data);
                 else if (name === "login") {
                     // hypixel moves you between lobbies with a fresh login packet
                     // and the client bins its scoreboard when one lands
                     state.sidebar.clear();
+                    state.dumped = false;
                     return;
                 } else return;
             } catch (error) {
