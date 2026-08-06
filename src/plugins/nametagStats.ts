@@ -1,7 +1,7 @@
 import type { Collected, EnrichmentEngine } from "../core/enrichment";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
 import { actionName } from "../core/lobby";
-import { componentToLegacy, PREFIX } from "../core/chat";
+import { componentToLegacy } from "../core/chat";
 import { GameTracker, tagsForGame, type GameMode } from "../core/game";
 import { dashUuid } from "../services/microsoft";
 import { COLOR_CODES, colorFromCode, lastColor } from "../util/mcColors";
@@ -49,7 +49,8 @@ interface SessionState {
     tagCache: Map<string, CacheEntry>;
     failures: Map<string, number>; // lowercase name -> lookups in a row that came back failed
     retries: Map<string, NodeJS.Timeout>; // job key -> pending second attempt
-    lookups: number; // fresh api lookups spent on this server, capped by maxTablistPlayers
+    joined: Set<string>; // lowercase names that joined after us, never capped
+    serverAt: number; // when this servers login packet landed, see INITIAL_DUMP_MS
     pending: Set<string>;
     dirty: Set<string>;
     games: GameTracker;
@@ -134,6 +135,10 @@ const FAILED_TTL_MS = 10_000;
 const RETRY_DELAY_MS = 15_000; // grows with each attempt
 const MAX_RETRIES = 3;
 
+// late joiners get a free pass on the lookup budget
+const INITIAL_DUMP_MS = 5_000;
+const JOIN_BATCH_MAX = 8;
+
 function hasColorCode(str: string): boolean {
     return /§[0-9a-f]/i.test(str);
 }
@@ -184,7 +189,8 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         tagCache: new Map(),
                         failures: new Map(),
                         retries: new Map(),
-                        lookups: 0,
+                        joined: new Set(),
+                        serverAt: Date.now(),
                         pending: new Set(),
                         dirty: new Set(),
                         games: new GameTracker(),
@@ -206,7 +212,8 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 state.dirty.clear();
                 for (const timer of state.retries.values()) clearTimeout(timer);
                 state.retries.clear();
-                state.lookups = 0; // new server, new budget
+                state.joined.clear();
+                state.serverAt = Date.now();
                 state.games.clear();
             };
 
@@ -256,7 +263,6 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 const hit = state.tagCache.get(key);
                 if (hit && hit.expires > Date.now()) return hit.lookup;
 
-                state.lookups++;
                 const entry: CacheEntry = { expires: Infinity, lookup: Promise.resolve({ tags: [], failed: true }) };
                 const settle = (result: Collected): Collected => {
                     entry.expires = Date.now() + (result.failed ? FAILED_TTL_MS : ttl);
@@ -317,8 +323,13 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 // deciding per entry meant whoever happened to be early in the
                 // packet got decorated and everybody after them never did
                 const queued = new Set<string>();
+                // the opening dump of a lobby arrives as one fat packet, or as a run of
+                // small ones right after the login. anything else is people arriving
+                const entries = data.data ?? [];
+                const dump = entries.length > JOIN_BATCH_MAX || Date.now() - state.serverAt < INITIAL_DUMP_MS;
+                let freed = false;
 
-                for (const entry of data.data ?? []) {
+                for (const entry of entries) {
                     const rawUuid = entry.uuid ?? entry.UUID;
                     if (!rawUuid) continue;
                     const uuid = dashUuid(rawUuid).toLowerCase();
@@ -330,6 +341,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                             serverDisplay: entry.displayName ? componentToLegacy(version, entry.displayName) : undefined,
                         });
                         state.tabByName.set(entry.name.toLowerCase(), uuid);
+                        if (!dump) state.joined.add(entry.name.toLowerCase());
                         queued.add(uuid);
                         // the team can arrive before the entry it names
                         const teamName = state.memberTeam.get(entry.name.toLowerCase());
@@ -342,8 +354,10 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                             // sessions dont grow forever
                             state.tabByName.delete(known.name.toLowerCase());
                             state.tagCache.delete(known.name.toLowerCase());
+                            state.joined.delete(known.name.toLowerCase());
                         }
                         state.tab.delete(uuid);
+                        freed = true;
                     } else if (action === "update_display_name") {
                         const known = state.tab.get(uuid);
                         if (!known) continue;
@@ -352,6 +366,13 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                             known.serverDisplay = incoming;
                             queued.add(uuid);
                         }
+                    }
+                }
+
+                // someone leaving hands their slot back to the budget
+                if (freed && tracked(state) < maxTab) {
+                    for (const [id, entry] of state.tab) {
+                        if (!entry.applied) queued.add(id);
                     }
                 }
 
@@ -373,15 +394,24 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 return `${team.serverPrefix}${color}${entry.name}${team.serverSuffix}`;
             }
 
-            // maxTablistPlayers is a budget of api lookups per server, not a switch
-            // that turns the whole list off once its big. a lobby of 90 spends 80 and
-            // decorates those 80, rather than deciding 90 is too many and decorating
-            // nobody. reading a name back out of the cache is free, so refreshing
-            // someone we already know never eats into it
+            // how much of the list we are holding stats for right now
+            function tracked(state: SessionState): number {
+                const now = Date.now();
+                let count = 0;
+                for (const entry of state.tab.values()) {
+                    const hit = state.tagCache.get(entry.name.toLowerCase());
+                    if (hit && hit.expires > now) count++;
+                }
+                return count;
+            }
+
+
             function affordLookup(state: SessionState, name: string): boolean {
-                const hit = state.tagCache.get(name.toLowerCase());
-                if (hit && hit.expires > Date.now()) return true;
-                return state.lookups < maxTab;
+                const key = name.toLowerCase();
+                const hit = state.tagCache.get(key);
+                if (hit && hit.expires > Date.now()) return true; 
+                if (state.joined.has(key)) return true; // joined after us
+                return tracked(state) < maxTab;
             }
 
             function queueTab(session: Session, state: SessionState, uuid: string): void {
