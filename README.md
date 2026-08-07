@@ -49,7 +49,9 @@ After this rProx will be running on localhost:25565
 
 `//afk [on|off]` - Toggle anti-afk, which DMs you a random string every `intervalSeconds` and hides the To/From echo
 
-`//catches [reset]` - Full breakdown of what you have fished in this session, per category and per hour
+`//session [reset]` - Full breakdown of what you have fished in this session, per category and per hour
+
+`//bossbar [info|test [seconds]|off|mode <replace|adopt|own>|entity <dragon|wither>]` - Put a test boss bar up, print what the injector is holding, or change how it draws without a restart
 
 ### Core Plugin Configuration
 
@@ -96,11 +98,25 @@ Automatically claims daily reward links in chat
 
 Counts what you catch while lobby fishing and puts the session totals on the sidebar, underneath Hypixels own fishing lines
 
+Also helps with a mythical fish boss bar
+
 ```json
 "lobbyFishing": {
     "enabled": true,
     "sidebar": true, // false counts catches for //catches without touching the sidebar
-    "maxSidebarLines": 15 // rows your client actually renders. raise it if yours draws more than vanilla, and none of Hypixels rows get hidden
+    "maxSidebarLines": 15, // rows your client actually renders. raise it if yours draws more than vanilla, and none of Hypixels rows get hidden
+    "mythical": {
+        "enabled": true, 
+        "bossBar": true, // show heat on bossbar
+        "debug": false, // allow //bossbar debug commands
+        "bar": "heat", // what bar progress fills with, "heat" or "progress
+        "bossBarMode": "replace", // "replace", "adopt" or "own". use replace
+        "bossEntity": "dragon", // "wither" or "dragon"
+        "heatPerClick": 10, 
+        "heatDecayPerSecond": 15, 
+        "heatMax": 100,
+        "safeHeat": 40 // when to start saying HOLD instead of CLICK
+    }
 }
 ```
 * **antiAfk**

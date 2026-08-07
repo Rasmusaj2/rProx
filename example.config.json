@@ -51,6 +51,18 @@
                 "treasure": "aqua",
                 "junk": "gray",
                 "creature": "light_purple"
+            },
+            "mythical": {
+                "enabled": true,
+                "bossBar": true,
+                "debug": false,
+                "bar": "heat",
+                "bossBarMode": "replace",
+                "bossEntity": "dragon",
+                "heatPerClick": 10,
+                "heatDecayPerSecond": 15,
+                "heatMax": 100,
+                "safeHeat": 70
             }
         },
         "antiAfk": {
