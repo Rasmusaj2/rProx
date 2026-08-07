@@ -55,8 +55,10 @@ export interface Session {
     game: GameMode; // active game, detected and kept up to date by nametagStats
     sendUpstream(message: string): void; // send a message/command as if typed
     sendPacket(name: string, data: unknown): void; // write a decoded packet to the client
-    players(): PlayerRef[]; // current tab list
+    players(): PlayerRef[]; // current tab list, npcs left out
     findPlayer(name: string): PlayerRef | undefined;
+    isNpc(name: string): boolean; // a lobby npc, never worth a lookup
+    markNpc(name: string): void; // for whoever spots the [NPC] rank first
 }
 
 export interface ChatMessage {

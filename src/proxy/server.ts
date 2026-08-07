@@ -167,6 +167,8 @@ export class ProxyServer {
             },
             players: () => lobby.list(),
             findPlayer: (name: string) => lobby.get(name),
+            isNpc: (name: string) => lobby.isNpc(name),
+            markNpc: (name: string) => lobby.markNpc(name),
         };
 
         let ended = false;

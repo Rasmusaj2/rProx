@@ -90,6 +90,7 @@ export class EnrichmentEngine {
         options: { always?: boolean } = {},
     ): Promise<void> {
         if (this.enrichers.length === 0) return;
+        if (session.isNpc(player.name)) return;
         const key = `${session.id}:${player.name.toLowerCase()}`;
         const last = this.recent.get(key) ?? 0;
         if (!options.always && Date.now() - last < this.debounceMs) return;
