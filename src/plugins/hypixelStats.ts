@@ -169,6 +169,19 @@ export const hypixelStatsPlugin: Plugin = {
             ];
         };
 
+        // handle a custom nick tag
+        const nickTags = (): Tag[] => [
+            {
+                text: "NICK",
+                short: "NICK",
+                formatted: c("red", "NICK"),
+                color: "red",
+                prefix: true,
+                priority: 100,
+                tooltip: ["§cNicked", "§7No Hypixel data behind this name", "§8via Hypixel API"].join("\n"),
+            },
+        ];
+
         const fishingTags = (player: HypixelPlayer): Tag[] => {
             const s = fishingStats(player);
             if (!s || s.totalCatches === 0) return [];
@@ -194,6 +207,7 @@ export const hypixelStatsPlugin: Plugin = {
                 const result = await fetch(player);
                 if (result.status !== "ok") {
                     if (RETRYABLE.includes(result.status)) throw new Error(fetchErrorMessage(result.status));
+                    if (result.status === "no_data") return nickTags(); // apply nick tag when no data available, ie. uuid doesnt exist on hypixel api
                     return null;
                 }
                 return [...bedwarsTags(result.player), 
