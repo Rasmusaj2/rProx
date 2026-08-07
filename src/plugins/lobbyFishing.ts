@@ -176,7 +176,7 @@ export const lobbyFishingPlugin: Plugin = {
         });
 
         api.on("chat", (msg, session) => {
-            const caught = parseCatch(msg.text);
+            const caught = parseCatch(msg.formatted);
             if (!caught) return;
             const state = stateFor(session.id);
             state.totals[caught.kind]++;
@@ -208,7 +208,7 @@ export const lobbyFishingPlugin: Plugin = {
                     return;
                 }
                 if (args[0]) { // incase of reset typo
-                    session.chat.text(`${PREFIX} §7Usage: §f${api.config.commandPrefix}catches §8[reset]`);
+                    session.chat.text(`${PREFIX} §7Usage: §f${api.config.commandPrefix}session §8[reset]`);
                     return;
                 }
 
