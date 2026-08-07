@@ -1,4 +1,5 @@
 import { PREFIX } from "../core/chat";
+import { isFakeUuid } from "../core/lobby";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
 import {
     HypixelService,
@@ -178,8 +179,9 @@ export const hypixelStatsPlugin: Plugin = {
             ];
         };
 
-        // handle a custom nick tag
-        const nickTags = (): Tag[] => [
+        // handle a custom nick tag. via says which of the two ways we worked it
+        // out, since one of them never touches the api
+        const nickTags = (via: string): Tag[] => [
             {
                 text: "NICK",
                 short: "NICK",
@@ -187,7 +189,7 @@ export const hypixelStatsPlugin: Plugin = {
                 color: "red",
                 prefix: true,
                 priority: 100,
-                tooltip: ["§cNicked", "§7No Hypixel data behind this name", "§8via Hypixel API"].join("\n"),
+                tooltip: ["§cNicked", "§7No account behind this name", `§8${via}`].join("\n"),
             },
         ];
 
@@ -213,10 +215,11 @@ export const hypixelStatsPlugin: Plugin = {
         api.registerEnricher({
             name: "hypixelStats",
             async enrich(player) {
+                if (player.uuid && isFakeUuid(player.uuid)) return nickTags("via tab list uuid"); // fake uuid means fake npc or nicked player
                 const result = await fetch(player);
                 if (result.status !== "ok") {
                     if (RETRYABLE.includes(result.status)) throw new Error(fetchErrorMessage(result.status));
-                    if (result.status === "no_data") return nickTags(); // apply nick tag when no data available, ie. uuid doesnt exist on hypixel api
+                    if (result.status === "no_data") return nickTags("via Hypixel API"); // apply nick tag when no data available, ie. uuid doesnt exist on hypixel api - shouldnt usually be hit since it'll be detected via uuid check
                     return null;
                 }
                 return [...bedwarsTags(result.player), 

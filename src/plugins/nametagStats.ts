@@ -275,7 +275,9 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 if (session.isNpc(name)) return;
                 session.markNpc(name);
                 state.tagCache.delete(name.toLowerCase());
-                api.log.debug(`skipping ${name}, [NPC] rank`);
+                // late joiner npc check
+                state.joined.delete(name.toLowerCase());
+                api.log.debug(`skipping ${name}, NPC`);
                 undecorate(session, state, name);
             }
 
@@ -379,7 +381,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         state.tab.set(uuid, { name: entry.name, serverDisplay });
                         state.tabByName.set(entry.name.toLowerCase(), uuid);
                         if (hasNpcRank(serverDisplay)) markNpc(session, state, entry.name);
-                        if (!dump) state.joined.add(entry.name.toLowerCase());
+                        if (!dump && !session.isNpc(entry.name)) state.joined.add(entry.name.toLowerCase());
                         queued.add(uuid);
                         // the team can arrive before the entry it names
                         const teamName = state.memberTeam.get(entry.name.toLowerCase());

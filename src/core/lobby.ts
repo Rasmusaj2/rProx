@@ -56,6 +56,14 @@ export function hasNpcRank(displayName: unknown): boolean {
     return NPC_RANK.test(stripColorCodes(componentText(displayName)));
 }
 
+// check if hypixel has given a player a fake uuid, if they have then we can skip the hypixel api lookup and just apply the nick tag
+// this also saves lookups on a lot of npcs we miss for reasons i cant figure out yet
+export function isFakeUuid(uuid: string): boolean {
+    const raw = uuid.replace(/-/g, "");
+    if (raw.length !== 32) return false; // fake
+    return raw[12] !== "4";
+}
+
 export class LobbyTracker {
     private byUuid = new Map<string, TabEntry>();
     private byName = new Map<string, string>(); // lowercase name -> uuid
