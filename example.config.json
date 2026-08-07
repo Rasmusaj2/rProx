@@ -5,7 +5,7 @@
         "targetHost": "mc.hypixel.net",
         "targetPort": 25565,
         "version": "1.8.9",
-        "motd": "\u00a7brProx \u00a72| \u00a76Hypixel Stats Proxy.",
+        "motd": "§brProx §2| §6Hypixel Stats Proxy.",
         "onlineMode": true,
         "maxPlayers": 10
     },
@@ -19,6 +19,9 @@
         "ignoreSelf": false
     },
     "builtInPlugins": {
+        "coreCommands": {
+            "enabled": true
+        },
         "hypixelStats": {
             "enabled": true,
             "apiKey": "",
@@ -28,21 +31,35 @@
             "enabled": true,
             "aboveHead": true,
             "tablist": true,
+            "cacheTtlSeconds": 120,
             "maxTablistPlayers": 32,
-            "cacheTtlSeconds": 120
+            "lookupConcurrency": 4
         },
         "dailyRewards": {
             "enabled": true,
             "mode": "chat",
             "prefer": [],
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) rProx/0.1",
             "timeoutMs": 10000
+        },
+        "antiAfk": {
+            "enabled": false,
+            "intervalSeconds": 150,
+            "prefix": "[AFK] ",
+            "charset": "abcdefghijklmnopqrstuvwxyz0123456789",
+            "messageLength": 16,
+            "hideMessages": true,
+            "autoStart": true,
+            "targetUser": null
         },
         "lobbyFishing": {
             "enabled": true,
             "sidebar": true,
             "maxSidebarLines": 15,
             "spacer": true,
-            "hideRows": ["hypixel level"],
+            "hideRows": [
+                "hypixel level"
+            ],
             "colors": {
                 "total": "green",
                 "fish": "yellow",
@@ -62,18 +79,12 @@
                 "heatPerClick": 10,
                 "heatDecayPerSecond": 15,
                 "heatMax": 100,
-                "safeHeat": 70
+                "safeHeat": 40
             }
         },
-        "antiAfk": {
-            "enabled": false,
-            "intervalSeconds": 150,
-            "prefix": "[AFK] ",
-            "charset": "abcdefghijklmnopqrstuvwxyz0123456789",
-            "messageLength": 16,
-            "hideMessages": true,
-            "autoStart": true,
-            "targetUser": null
+        "example": {
+            "enabled": true,
+            "reply": "pong"
         }
     },
     "pluginDirectory": "./plugins"

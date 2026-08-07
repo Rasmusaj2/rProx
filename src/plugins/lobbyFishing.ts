@@ -127,6 +127,26 @@ export const lobbyFishingPlugin: Plugin = {
     name: "lobbyFishing",
     version: "0.1.0",
     description: "Session catch counts and hourly rates on the main lobby sidebar.",
+    defaultConfig: {
+        enabled: true,
+        sidebar: true, // false still counts catches for //session, it just draws nothing
+        maxSidebarLines: SIDEBAR_LINES, // rows your client renders, raise it if yours draws more than vanilla
+        spacer: true, // blank row between hypixels rows and ours
+        hideRows: DEFAULT_HIDDEN_ROWS, // hypixel rows to drop for the room, matched colorless and case insensitively
+        colors: DEFAULT_COLORS, // per row number color, "gold" or "§6"
+        mythical: {
+            enabled: true, // follow the fight
+            bossBar: true, // and draw it as a boss bar
+            debug: false, // registers //bossbar
+            bar: "heat", // what the fill means, "heat" or "progress"
+            bossBarMode: "replace", // "replace", "adopt" or "own"
+            bossEntity: "dragon", // "dragon" or "wither"
+            heatPerClick: DEFAULT_HEAT.perClick,
+            heatDecayPerSecond: DEFAULT_HEAT.decayPerSecond,
+            heatMax: DEFAULT_HEAT.max,
+            safeHeat: DEFAULT_HEAT.safe, // at or over this the bar says HOLD instead of CLICK
+        },
+    },
     setup(api) {
         const config = api.pluginConfig as LobbyFishingConfig;
         const useSidebar = config.sidebar !== false;

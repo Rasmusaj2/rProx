@@ -9,12 +9,13 @@ interface AntiAfkConfig {
     messageLength?: number;
     hideMessages?: boolean; // swallow the To/From echo
     autoStart?: boolean; // start on join, or wait for //afk
-    targetUser?: string; // use a targetUser instead of yourself for the DM, lets you avoid the "pling" on dm
+    targetUser?: string | null; // use a targetUser instead of yourself for the DM, lets you avoid the "pling" on dm
 }
 
 const DEFAULT_CHARSET = "abcdefghijklmnopqrstuvwxyz0123456789";
-const DEFAULT_INTERVAL = 60;
-const DEFAULT_LENGTH = 8;
+const DEFAULT_INTERVAL = 150;
+const DEFAULT_LENGTH = 16;
+const DEFAULT_PREFIX = "[AFK] ";
 // dming yourself faster than this is just asking hypixel for a chat mute
 const MIN_INTERVAL = 10;
 // how many recent payloads stay hideable, a To and a From come back per message
@@ -37,6 +38,18 @@ export const antiAfkPlugin: Plugin = {
     name: "antiAfk",
     version: "0.1.0",
     description: "Anti-AFK by messaging yourself a random string on an interval.",
+
+    defaultConfig: {
+        enabled: false,
+        intervalSeconds: DEFAULT_INTERVAL,
+        prefix: DEFAULT_PREFIX,
+        charset: DEFAULT_CHARSET,
+        messageLength: DEFAULT_LENGTH,
+        hideMessages: true,
+        autoStart: true,
+        targetUser: null,
+    },
+
     setup(api) {
         const config = api.pluginConfig as AntiAfkConfig;
 
@@ -52,7 +65,7 @@ export const antiAfkPlugin: Plugin = {
         }
         const hideMessages = config.hideMessages !== false;
         const autoStart = config.autoStart !== false;
-        const messagePrefix = config.prefix ?? "";
+        const messagePrefix = config.prefix ?? DEFAULT_PREFIX;
 
         const sessions = new Map<string, AfkState>();
 

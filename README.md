@@ -8,12 +8,17 @@ rProx watches who joins your games & lobbies, and looks up playerdata and stats
 Clone the reposity & install the required dependencies.
 ```bash
 npm install
-cp  config.example.json  config.json  # then edit config.json - On Windows, copy the file config.example.json file
-npm  run  dev  # or: npm run build && npm run serve
+npm run dev  # or: npm run build && npm run serve
 ```
 After this rProx will be running on localhost:25565
 
+On first boot, rProx creates a config.json file. Stop the process, and modify the config to your liking.
 
+It is recommended to set up your Hypixel API Key before proceeding and launching again.
+
+If you'd rather manually create this file before launch, [`example.config.json`](example.config.json) contains the same data, and will allow you to set it up before first launch
+
+New settings are automatically filled into your config from new updates or plugins.
 
 ## Default Commands
 () -  Required  arguments
@@ -80,7 +85,8 @@ Shows player statistics in the tab menu or above their playerhead in lobbies & g
     "aboveHead": true, // show stats above the players head
     "tablist": true, // show stats in the tablist
     "maxTablistPlayers": 32, // player list size above which we stop looking anyone new up, tablist and above-head alike. raise it to cover big hubs, at the cost of the API ratelimit
-    "cacheTtlSeconds": 120
+    "cacheTtlSeconds": 120,
+    "lookupConcurrency": 4 // how many lookups are allowed to be in flight at once
 } // NOTE: API Key here leeches from hypixelStats
 ```
 * **dailyRewards**
@@ -91,6 +97,7 @@ Automatically claims daily reward links in chat
     "enabled": true,
     "mode": "chat", // chat or auto - Decides if it should automatically claim a link when seen, or give the option to pick in chat
     "prefer": [], // which specific game to prefer, ie. "uhc", "skywars", "walls3". Will autopick this incase of ties
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) rProx/0.1", // what the reward page is asked as
     "timeoutMs": 10000
 }
 ```
@@ -105,6 +112,17 @@ Also helps with a mythical fish boss bar
     "enabled": true,
     "sidebar": true, // false counts catches for //catches without touching the sidebar
     "maxSidebarLines": 15, // rows your client actually renders. raise it if yours draws more than vanilla, and none of Hypixels rows get hidden
+    "spacer": true, // blank row between Hypixels rows and ours
+    "hideRows": ["hypixel level"], // Hypixel rows to drop to make room, matched as regex, colorless and case insensitively
+    "colors": { // the number color per row, a name like "gold" or a code like "§6"
+        "total": "green",
+        "fish": "yellow",
+        "plant": "dark_green",
+        "mythical": "gold",
+        "treasure": "aqua",
+        "junk": "gray",
+        "creature": "light_purple"
+    },
     "mythical": {
         "enabled": true, 
         "bossBar": true, // show heat on bossbar
@@ -143,5 +161,27 @@ rProx supports custom Plugins to add extended functionality and stat checking fe
 Writing a plugin is simple. Add a file in the [`./plugins/`](plugins/) directory (Or whats set in `pluginDirectory` in the config). Plugins support javascript code. 
 
 An example is supplied in [`plugins/example.plugin.js`](plugins/example.plugin.js).
+
+A plugin can ship its own settings by exporting a `defaultConfig` alongside `name`
+and `setup`. It gets written into `builtInPlugins` under the plugins name the first
+time it loads, and handed back as `api.pluginConfig`:
+
+```js
+module.exports = {
+    name: "example",
+
+    defaultConfig: {
+        enabled: true,
+        reply: "pong",
+    },
+
+    setup(api) {
+        const reply = api.pluginConfig.reply ?? "pong"; // already filled in from config.json
+        // ...
+    },
+}
+```
+
+A plugin without a `defaultConfig` still gets an `"enabled": true` block written for it, so anything in the directory can be switched off from `config.json`.
 
 ⚠️ **Please be aware that plugins can execute arbitrary code on your machine. Only install plugins you trust.**

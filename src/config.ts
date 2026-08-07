@@ -1,5 +1,8 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { createLogger } from "./util/log";
+
+const log = createLogger("config");
 
 export interface Config {
     proxy: {
@@ -32,7 +35,7 @@ const DEFAULTS: Config = {
         targetHost: "mc.hypixel.net",
         targetPort: 25565,
         version: "1.8.9",
-        motd: "\u00a7brProx \u00a72| \u00a76Hypixel Stats Proxy.",
+        motd: "§brProx §2| §6Hypixel Stats Proxy.",
         onlineMode: true,
         maxPlayers: 10
     },
@@ -49,6 +52,18 @@ const DEFAULTS: Config = {
     pluginDirectory: "./plugins",
 }
 
+const CONFIG_FILE = "config.json";
+const FALLBACK_FILE = "config.default.json";
+
+
+function baseConfig(): Config {
+    return structuredClone(DEFAULTS); // copy by value so the plugin cannot mutate the default object
+}
+
+function isBlock(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 // Merge two objects recursively, with the second object overriding the first. Arrays are not merged, but replaced.
 function deepMerge<T>(base: T, override: unknown): T {
   if (override === null || override === undefined) return base;
@@ -62,17 +77,62 @@ function deepMerge<T>(base: T, override: unknown): T {
   return out as T;
 }
 
+export function configPath(): string {
+    return resolve(process.cwd(), CONFIG_FILE);
+}
+
+function readJson(path: string): unknown {
+    try {
+        return JSON.parse(readFileSync(path, "utf-8"));
+    } catch (error) {
+        throw new Error(`${path} could not be read: ${error instanceof Error ? error.message : error}`);
+    }
+}
+
+export function saveConfig(config: Config): boolean {
+    const path = configPath();
+    try {
+        writeFileSync(path, `${JSON.stringify(config, null, 4)}\n`, "utf-8");
+        return true;
+    } catch (error) {
+        log.warn(`could not write ${path}: ${error}`);
+        return false;
+    }
+}
+
 export function loadConfig(): Config {
-    const candidates = [
-        resolve(process.cwd(), "config.json"),
-        resolve(process.cwd(), "config.default.json"), // fallback to default config if no config.json is found
-    ].filter(Boolean) as string[];
-    for (const candidate of candidates) {
-        if (existsSync(candidate)) {
-            const rawData = readFileSync(candidate, "utf-8");
-            const parsedData = JSON.parse(rawData);
-            return deepMerge(DEFAULTS, parsedData);
+    const path = configPath();
+    if (existsSync(path)) return deepMerge(baseConfig(), readJson(path));
+
+    // write if doesnt exist
+    const fallback = resolve(process.cwd(), FALLBACK_FILE); // a shipped default, if there is one
+    const config = existsSync(fallback) ? deepMerge(baseConfig(), readJson(fallback)) : baseConfig();
+    if (saveConfig(config)) {
+        log.info(`no ${CONFIG_FILE} found, generated one${existsSync(fallback) ? ` from ${FALLBACK_FILE}` : ""}`);
+    }
+    return config;
+}
+
+// copy over keys from defaults that are missing in target, recursively
+function fillDefaults(target: Record<string, unknown>, defaults: Record<string, unknown>): boolean {
+    let changed = false;
+    for (const [key, value] of Object.entries(defaults)) {
+        if (!(key in target)) {
+            target[key] = structuredClone(value); // copy by value so the plugin cannot mutate the default object
+            changed = true;
+        } else if (isBlock(target[key]) && isBlock(value)) {
+            if (fillDefaults(target[key] as Record<string, unknown>, value)) changed = true;
         }
     }
-    return DEFAULTS;
+    return changed;
+}
+
+
+export function applyPluginDefaults(config: Config, name: string, defaults: Record<string, unknown>): boolean {
+    const existing = config.builtInPlugins[name];
+    const block = isBlock(existing) ? existing : {};
+    let changed = !isBlock(existing);
+    if (fillDefaults(block, defaults)) changed = true;
+    config.builtInPlugins[name] = block;
+    return changed;
 }

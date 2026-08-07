@@ -14,6 +14,11 @@ export function createCoreCommandsPlugin(
         name: "coreCommands",
         version: "0.1.0",
         description: "//help, //who, //sc and //plugins",
+
+        defaultConfig: {
+            enabled: true,
+        },
+
         setup(api) {
             api.registerCommand(
                 "who",

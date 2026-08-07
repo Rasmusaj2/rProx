@@ -28,11 +28,21 @@ interface DailyRewardsConfig {
 
 // only announce/claim a given link once, hypixel repeats the reminder
 const MAX_REMEMBERED = 64;
+const DEFAULT_TIMEOUT_MS = 10_000;
 
 export const dailyRewardsPlugin: Plugin = {
     name: "dailyRewards",
     version: "0.1.0",
     description: "Catches Hypixel daily reward links, claims them or offers them in chat.",
+
+    defaultConfig: {
+        enabled: true,
+        mode: "chat",
+        prefer: [],
+        userAgent: DEFAULT_USER_AGENT,
+        timeoutMs: DEFAULT_TIMEOUT_MS,
+    },
+
     setup(api) {
         const config = api.pluginConfig as DailyRewardsConfig;
         if (config.mode && config.mode !== "auto" && config.mode !== "chat") {
@@ -43,7 +53,7 @@ export const dailyRewardsPlugin: Plugin = {
         const prefix = api.config.commandPrefix;
         const request = {
             userAgent: config.userAgent ?? DEFAULT_USER_AGENT,
-            timeoutMs: config.timeoutMs ?? 10_000,
+            timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         };
 
         const handled = new Set<string>();

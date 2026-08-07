@@ -3,7 +3,7 @@ import { resolve, join, extname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createLogger } from "../util/log";
 import type { HttpClient } from "../util/http";
-import type { Config } from "../config";
+import { applyPluginDefaults, saveConfig, type Config } from "../config";
 import type { EventBus } from "./events";
 import type { EnrichmentEngine } from "./enrichment";
 import type { ChatFilter, ChatMessage, CommandHandler, Plugin, PluginApi, Session } from "./types";
@@ -24,6 +24,7 @@ export class PluginManager {
     private commands = new Map<string, RegisteredCommand>();
     private chatFilters: Array<{ filter: ChatFilter; plugin: string }> = []; // allow plugins to add chat filters so they can hide messages from the client for data collection (ie. running /who and needing to hide it or dms from antiafk)
     private loaded: string[] = [];
+    private freshDefaults: string[] = []; // plugins whose defaults are not in config.json yet
 
     constructor(
         private readonly config: Config,
@@ -34,6 +35,17 @@ export class PluginManager {
 
     private pluginConfig(name: string): Record<string, unknown> {
         return (this.config.builtInPlugins[name] as Record<string, unknown>) ?? {};
+    }
+
+    private ensureConfig(plugin: Plugin): void {
+        const defaults = plugin.defaultConfig ?? { enabled: true }; // a plugin without a defaultConfig is still on by default, but has no settings to write
+        if (applyPluginDefaults(this.config, plugin.name, defaults)) this.freshDefaults.push(plugin.name);
+    }
+
+    private persistDefaults(): void {
+        if (this.freshDefaults.length === 0) return;
+        const names = this.freshDefaults.splice(0);
+        if (saveConfig(this.config)) log.info(`wrote default config for ${names.join(", ")} into config.json`);
     }
 
     private buildApi(plugin: Plugin): PluginApi {
@@ -69,8 +81,12 @@ export class PluginManager {
         return hide;
     }
 
-    // a plugin is on unless its config block says enabled: false
+    // a plugin is on unless its config block says enabled: false.
+    // whoever registers a batch flushes the config afterwards, see registerAll
     async register(plugin: Plugin): Promise<void> {
+        // a disabled plugin still gets its block, so the settings it would have
+        // read are there to look at before turning it back on
+        this.ensureConfig(plugin);
         if (this.pluginConfig(plugin.name).enabled === false) { // yes this does mean you can disable external plugins in the config.json file
             // i should probably make a seperate config thing for external plugins, but honestly i dont care enough and they should implement it themselves for now
             // untill i get around to making a "externalPlugins" config area in the config.json file which external plugins can have a default config written to
@@ -88,6 +104,7 @@ export class PluginManager {
 
     async registerAll(plugins: Plugin[]): Promise<void> {
         for (const plugin of plugins) await this.register(plugin);
+        this.persistDefaults();
     }
 
     // drop-in plugins from the configured directory
@@ -108,6 +125,7 @@ export class PluginManager {
                 log.error(`failed to import external plugin ${file}: ${error}`);
             }
         }
+        this.persistDefaults();
     }
 
     // what the plugin directory has to offer, loaded or not

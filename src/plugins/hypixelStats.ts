@@ -34,6 +34,8 @@ interface HypixelStatsConfig {
     cacheTtlSeconds?: number;
 }
 
+const DEFAULT_CACHE_SECONDS = 300;
+
 const c = (color: McColorName, value: string | number) => COLOR_CODES[color] + value;
 
 // enrichment changes retryable array 
@@ -43,9 +45,16 @@ export const hypixelStatsPlugin: Plugin = {
     name: "hypixelStats",
     version: "0.1.2",
     description: "Bedwars, SkyWars and Duels stats from the Hypixel API.",
+
+    defaultConfig: {
+        enabled: true,
+        apiKey: "",
+        cacheTtlSeconds: DEFAULT_CACHE_SECONDS,
+    },
+
     setup(api) {
         const config = api.pluginConfig as HypixelStatsConfig;
-        const ttl = (config.cacheTtlSeconds ?? 300) * 1000;
+        const ttl = (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000;
         const hypixel = new HypixelService(api.http, config.apiKey ?? "", ttl);
 
         if (!hypixel.enabled) {

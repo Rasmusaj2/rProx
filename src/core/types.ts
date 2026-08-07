@@ -99,5 +99,6 @@ export interface Plugin {
     name: string;
     version?: string;
     description?: string;
+    defaultConfig?: Record<string, unknown>;
     setup(api: PluginApi): void | Promise<void>;
 }

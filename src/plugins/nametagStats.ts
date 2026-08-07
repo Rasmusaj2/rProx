@@ -60,6 +60,10 @@ interface SessionState {
 const MAX_TEAM_FIELD = 16; // protocol cap on a 1.8 team prefix/suffix
 const MAX_TAB_SUFFIX = 32;
 
+const DEFAULT_CACHE_SECONDS = 120;
+const DEFAULT_MAX_TABLIST = 32;
+const DEFAULT_CONCURRENCY = 4;
+
 const byPriority = (a: Tag, b: Tag) => (b.priority ?? 0) - (a.priority ?? 0); // higher priority first, undefined is 0
 
 
@@ -168,14 +172,24 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
         name: "nametagStats",
         version: "0.1.2",
         description: "Stats on tab list entries and above-head nametags.",
+
+        defaultConfig: {
+            enabled: true,
+            aboveHead: true,
+            tablist: true,
+            cacheTtlSeconds: DEFAULT_CACHE_SECONDS,
+            maxTablistPlayers: DEFAULT_MAX_TABLIST,
+            lookupConcurrency: DEFAULT_CONCURRENCY,
+        },
+
         setup(api) {
             const config = api.pluginConfig as NametagConfig;
-            const ttl = (config.cacheTtlSeconds ?? 120) * 1000;
+            const ttl = (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000;
             const doAboveHead = config.aboveHead !== false;
             const doTablist = config.tablist !== false;
-            const maxTab = config.maxTablistPlayers ?? 32;
+            const maxTab = config.maxTablistPlayers ?? DEFAULT_MAX_TABLIST;
             const version = api.config.proxy.version;
-            const concurrency = Math.max(1, config.lookupConcurrency ?? 4);
+            const concurrency = Math.max(1, config.lookupConcurrency ?? DEFAULT_CONCURRENCY);
             const sessions = new Map<string, SessionState>();
 
             const stateFor = (id: string): SessionState => {
