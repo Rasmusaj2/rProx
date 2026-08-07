@@ -1,6 +1,6 @@
 {
   "name": "rProx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Hypixel Stat Checking proxy inspired by Lilith & Starfish.",
   "type": "commonjs",
   "main": "dist/index.js",
@@ -11,8 +11,14 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
+    "prune:mcdata": "node scripts/prune-mcdata.js",
+    "package": "npm run build && npm run prune:mcdata && pkg . --output build/rProx.exe",
     "serve": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "pkg": {
+    "targets": ["node22-win-x64"],
+    "compress": "Brotli"
   },
   "engines": {
     "node": ">=18"
