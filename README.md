@@ -10,6 +10,9 @@ Clone the reposity & install the required dependencies.
 npm install
 npm run dev  # or: npm run build && npm run serve
 ```
+
+*Otherwise, a Windows binary is available [`here`](https://github.com/Rasmusaj2/rProx/releases)*
+
 After this rProx will be running on localhost:25565
 
 On first boot, rProx creates a config.json file. Stop the process, and modify the config to your liking.
