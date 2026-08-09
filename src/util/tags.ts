@@ -3,6 +3,8 @@
 // on top of this, the (usually) prefix contains a "tooltip" field.
 // This field is used when hovering over the tag in chat, ie. autodisplayed from either /who or game countdown
 
+// if new tags are made, they should be added to the "hypixelStats" enricher in src/plugins/hypixelStats.ts
+
 import type { Tag } from "../core/types";
 import {
     HypixelService,
