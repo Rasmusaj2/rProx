@@ -290,7 +290,6 @@ export class MythicalFight {
         const elapsed = Math.max(0, now - this.heatAt);
         this.heatAt = now;
         this.heat = Math.max(0, this.heat - (this.model.decayPerSecond * elapsed) / 1000);
-        console.log(`cooling ${elapsed}ms, heat now ${this.heat}`);
     }
 
     private sweep(now: number): void {
