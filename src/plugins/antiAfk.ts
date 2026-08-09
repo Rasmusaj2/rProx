@@ -13,7 +13,7 @@ interface AntiAfkConfig {
 }
 
 const DEFAULT_CHARSET = "abcdefghijklmnopqrstuvwxyz0123456789";
-const DEFAULT_INTERVAL = 150;
+const DEFAULT_INTERVAL = 90;
 const DEFAULT_LENGTH = 16;
 const DEFAULT_PREFIX = "[AFK] ";
 // dming yourself faster than this is just asking hypixel for a chat mute
