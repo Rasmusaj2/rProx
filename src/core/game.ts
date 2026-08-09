@@ -2,24 +2,151 @@ import { stripColorCodes } from "../util/mcColors";
 import type { Tag } from "./types";
 
 // which hypixel game the client is currently looking at
-export type GameMode = "bedwars" 
+export type GameMode = // this is kinda annoying to keep as a string union should've probably been like an enum but whatever
+// single gamemode games
+  "bedwars" 
 | "skywars" 
 | "duels" 
-| "uhc"
-| "tntgames"
 | "murdermystery"
-| "lobby" 
+| "blitz"
+| "buildbattle"
+| "cvc"
+| "megawalls"
+| "smashheroes"
+| "warlords"
+
+// uhc
+| "uhc"
+| "speeduhc"
+
+// tnt games
+| "tntgames"
+| "tntrun"
+| "tnttag"
+| "pvprun"
+| "tntwizards"
+
+// wool games
+| "woolgames"
+| "woolwars"
+| "sheepwars"
+| "ctw"
+
+// arcade
+| "arcade"
+| "blockingdead"
+| "bountyhunters"
+| "creeperattack"
+| "disasters"
+| "dragonwars"
+| "dropper"
+| "enderspleef"
+| "farmhunt"
+| "football"
+| "galaxywars"
+| "hideandseek"
+| "holeinthewall"
+| "hypixelsays"
+| "miniwalls"
+| "partygames"
+| "pixelpainters"
+| "pixelparty"
+| "throwout"
+| "zombies"
+
+// simulators
+| "grinchsim"
+| "santasim"
+| "scubasim"
+| "eastersim"
+| "halloweensim"
+
+// classic games
+| "classic"
+| "quake"
+| "arena"
+| "thewalls"
+| "vampirez"
+| "tkr"
+| "paintball"
+
+// other
+| "housing" 
+| "lobby" // fishing primarily
 | "unknown";
 
 // get from sidebar
+// REMEMBER: this matches first regex. keep simpler regexes later to avoid overlapping (ie. "hypixel" for the hypixel lobby, but that regex also gets triggered by hypixel says - same with (s)uhc)
 const TITLES: Array<[pattern: RegExp, game: GameMode]> = [
     [/BED\s*WARS/, "bedwars"],
     [/SKY\s*WARS/, "skywars"],
     [/DUELS?/, "duels"],
-    [/HYPIXEL/, "lobby"],
-    [/UHC/, "uhc"],
-    [/TNT\s*GAMES?/, "tntgames"],
     [/MURDER\s*MYSTERY/, "murdermystery"],
+    [/BLITZ\s*SG/, "blitz"],
+    [/BUILD\s*BATTLE/, "buildbattle"],
+    [/COPS\s*AND\s*CRIMS/, "cvc"],
+    [/MEGA\s*WALLS?/, "megawalls"],
+    [/SMASH\s*HEROES?/, "smashheroes"],
+    [/WARLORDS?/, "warlords"],
+
+    
+    [/SPEED\s*UHC/, "speeduhc"],
+    [/UHC/, "uhc"],
+
+
+    [/TNT\s*GAMES?/, "tntgames"],
+    [/TNT\s*RUN/, "tntrun"],
+    [/TNT\s*TAG/, "tnttag"],
+    [/PVP\s*RUN/, "pvprun"],
+    [/TNT\s*WIZARDS?/, "tntwizards"],
+
+
+    [/WOOL\s*GAMES?/, "woolgames"],
+    [/WOOL\s*WARS?/, "woolwars"],
+    [/SHEEP\s*WARS?/, "sheepwars"],
+    [/CAPTURE\s*THE\s*WOOL/, "ctw"],
+
+
+    [/ARCADE\s*GAMES?/, "arcade"],
+    [/BLOCKING\s*DEAD/, "blockingdead"],
+    [/BOUNTY\s*HUNTERS?/, "bountyhunters"],
+    [/CREEPER\s*ATTACK/, "creeperattack"],
+    [/DISASTERS?/, "disasters"],
+    [/DRAGON\s*WARS?/, "dragonwars"],
+    [/DROPPER/, "dropper"],
+    [/ENDER\s*SPLEEF/, "enderspleef"],
+    [/FARM\s*HUNT/, "farmhunt"],
+    [/FOOTBALL/, "football"],
+    [/GALAXY\s*WARS?/, "galaxywars"],
+    [/HIDE\s*AND\s*SEEK/, "hideandseek"],
+    [/HOLE\s*IN\s*THE\s*WALL/, "holeinthewall"],
+    [/HYPIXEL\s*SAYS?/, "hypixelsays"],
+    [/MINI\s*WALLS?/, "miniwalls"],
+    [/PARTY\s*GAMES?/, "partygames"],
+    [/PIXEL\s*PAINTERS?/, "pixelpainters"],
+    [/PIXEL\s*PARTY/, "pixelparty"],
+    [/THROW\s*OUT/, "throwout"],
+    [/ZOMBIES?/, "zombies"],
+
+
+    [/GRINCH\s*SIM/, "grinchsim"],
+    [/SANTA\s*SIM/, "santasim"],
+    [/SCUBA\s*SIM/, "scubasim"],
+    [/EASTER\s*SIM/, "eastersim"],
+    [/HALLOWEEN\s*SIM/, "halloweensim"],
+
+
+    [/CLASSIC\s*GAMES?/, "classic"],
+    [/QUAKE/, "quake"],
+    [/ARENA/, "arena"],
+    [/THE\s*WALLS?/, "thewalls"],
+    [/VAMPIREZ?/, "vampirez"],
+    [/TOWER\s*KART\s*RACERS/, "tkr"],
+    [/PAINTBALL/, "paintball"],
+
+
+    [/HOUSING/, "housing"],
+    [/HYPIXEL/, "lobby"], // keep this at the bottom so it only matches if nothing else does. hypixel says matches otherwise but im not implementing it yet
 ];
 
 export function gameFromTitle(title: string): GameMode {
