@@ -1,5 +1,5 @@
 import { COLOR_CODES, type McColorName } from "../util/mcColors";
-
+import { BEDWARS_FKDR, tierColor, tierFormat } from "./thresholds";
 
 // PRESTIGE STAR COLORING
 // Slumber 2.0 lets you pick custom prestige stuff but idk how it works yet
@@ -56,27 +56,11 @@ export function formatStar(level: number): string {
     return COLOR_CODES[starColor(level)] + text;
 }
 
-// randomly selected thresholds for "danger" coloring
-// to be changed
-
-const FKDR_TIERS: Array<[limit: number, color: McColorName]> = [
-    [0.75, "gray"],
-    [1.5, "white"],
-    [3, "yellow"],
-    [7, "light_purple"],
-    [15, "red"],
-    [35, "dark_red"],
-    [Infinity, "dark_purple"]
-]
-
 export function fkdrColor(fkdr: number): McColorName {
-    for (const [limit, color] of FKDR_TIERS) {
-        if (fkdr < limit) return color; // this should always return a color since the last limit is Infinity but my linter doesnt like it
-    }
-    return "dark_purple"; // fallback for linter stuff
+    return tierColor(fkdr, BEDWARS_FKDR);
 }
 
 // format properly with colors
 export function formatFkdr(fkdr: number): string {
-    return COLOR_CODES[fkdrColor(fkdr)] + fkdr;
+    return tierFormat(fkdr, BEDWARS_FKDR);
 }

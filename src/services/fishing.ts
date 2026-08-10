@@ -1,5 +1,7 @@
 import { COLOR_CODES, type McColorName } from "../util/mcColors";
 import { MYTHICAL_FANCY_NAMES, MYTHICAL_ORB_WEIGHTS } from "./hypixel";
+import { compact } from "./games";
+import { FISHING_CATCHES, FISHING_MYTHICAL, tierColor, tierFormat } from "./thresholds";
 
 // weight stuff blah blah
 export function weightColor(orb: string, weight: number): McColorName {
@@ -15,27 +17,9 @@ export function formatWeight(orb: string, weight: number): string {
 }
 
 // mythical catches are the headline number, so the ladder is built around them
-const FISHING_TIERS: Array<[limit: number, color: McColorName]> = [
-    [100, "gray"],
-    [500, "white"],
-    [1000, "gold"],
-    [2000, "aqua"],
-    [5000, "dark_green"],
-    [10000, "dark_red"],
-    [Infinity, "dark_purple"],
-];
 
 export function mythicalColor(mythical: number): McColorName {
-    for (const [limit, color] of FISHING_TIERS) {
-        if (mythical < limit) return color;
-    }
-    return "dark_purple";
-}
-
-// counts get big enough to blow the 16 char team prefix budget, so shorten them
-function compact(value: number, suffix: string): string {
-    if (value < 10_000) return value.toString() + suffix;
-    return (value / 1000).toFixed(1).replace(/\.0$/, "") + "k" + suffix;
+    return tierColor(mythical, FISHING_MYTHICAL);
 }
 
 export function mythicalText(mythical: number): string {
@@ -43,25 +27,13 @@ export function mythicalText(mythical: number): string {
 }
 
 export function formatMythical(mythical: number): string {
-    return COLOR_CODES[mythicalColor(mythical)] + mythicalText(mythical);
+    return tierFormat(mythical, FISHING_MYTHICAL, mythicalText(mythical));
 }
 
 // everything reeled in, which is mostly a measure of hours spent rather than luck
-const CATCH_TIERS: Array<[limit: number, color: McColorName]> = [
-    [500, "gray"],
-    [2500, "white"],
-    [10000, "gold"],
-    [25000, "aqua"],
-    [60000, "dark_green"],
-    [150000, "dark_red"],
-    [Infinity, "dark_purple"],
-];
 
 export function catchesColor(catches: number): McColorName {
-    for (const [limit, color] of CATCH_TIERS) {
-        if (catches < limit) return color;
-    }
-    return "dark_purple";
+    return tierColor(catches, FISHING_CATCHES);
 }
 
 export function catchesText(catches: number): string {
@@ -69,7 +41,7 @@ export function catchesText(catches: number): string {
 }
 
 export function formatCatches(catches: number): string {
-    return COLOR_CODES[catchesColor(catches)] + catchesText(catches);
+    return tierFormat(catches, FISHING_CATCHES, catchesText(catches));
 }
 
 
