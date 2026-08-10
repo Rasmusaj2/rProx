@@ -170,7 +170,7 @@ function limiter(max: number): (fn: () => Promise<void>) => void {
 export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin { // this is not 
     return {
         name: "nametagStats",
-        version: "0.1.2",
+        version: "0.2.0",
         description: "Stats on tab list entries and above-head nametags.",
 
         defaultConfig: {

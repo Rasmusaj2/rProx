@@ -1,6 +1,6 @@
 {
   "name": "rProx",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A Hypixel Stat Checking proxy inspired by Lilith & Starfish.",
   "type": "commonjs",
   "main": "dist/index.js",

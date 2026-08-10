@@ -1,9 +1,5 @@
 // defines thresholds for every color across every game (except stars)
-
 import { COLOR_CODES, type McColorName } from "../util/mcColors";
-import { formatStar } from "./bedwars";
-
-export function formatStars(level: number): string { return formatStar(level); } // re-export for consistency with other services, i cant be bothered to move it properly (TODO: handle)
 export type Threshold = [limit: number, color: McColorName];
 export type Thresholds = ReadonlyArray<Threshold>;
 
@@ -34,7 +30,6 @@ export const countTiers = ladder(COUNT_RUN);
 
 // single mode
 export const BEDWARS_FKDR = ratioTiers(0.75, 1.5, 3, 7, 15, 35);
-
 export const SKYWARS_KDR = ratioTiers(0.75, 1.5, 3, 5, 8, 12);
 
 export const DUELS_WINS = countTiers(100, 500, 1000, 2000, 5000, 10000);

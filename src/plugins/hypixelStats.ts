@@ -15,14 +15,23 @@ import {
     type HypixelPlayer,
     type PlayerFetch,
 } from "../services/hypixel";
-import { formatStar, starText, starColor, formatFkdr, fkdrColor } from "../services/bedwars";
-
-import * as sw from "../services/skywars";
-import * as duels from "../services/duels";
-import * as uhc from "../services/uhc";
-import * as tnt from "../services/tntgames";
-import * as mm from "../services/murdermystery";
+import { bedwarsStar } from "../services/prestige";
 import * as fish from "../services/fishing";
+import {
+    tierFormat,
+    BEDWARS_FKDR,
+    SKYWARS_KDR,
+    DUELS_WINS,
+    DUELS_WLR,
+    UHC_WINS,
+    UHC_KDR,
+    TNT_TOTAL_WINS,
+    TNT_RUN_WINS,
+    MM_WINS,
+    MM_WLR,
+    FISHING_MYTHICAL,
+    FISHING_CATCHES,
+} from "../services/thresholds";
 
 import { formatRankedName } from "../services/rank";
 import { resolveUuid } from "../services/microsoft";
@@ -31,8 +40,9 @@ import { COLOR_CODES, type McColorName } from "../util/mcColors";
 import * as tags from "../util/tags";
 
 
-// hypixel stats. an enricher for the inline star + fkdr, plus //bw, //sw and
-// //duels for the full breakdown. needs a key from developer.hypixel.net.
+// hypixel stats. an enricher handing back the tags for every game we know (see
+// util/tags.ts), plus stat commands (ie. //bw, //sw and //duels) 
+// needs api key from https://developer.hypixel.net/
 
 interface HypixelStatsConfig {
     enabled?: boolean;
@@ -49,8 +59,8 @@ const RETRYABLE: ReadonlyArray<PlayerFetch["status"]> = ["ratelimited", "error",
 
 export const hypixelStatsPlugin: Plugin = {
     name: "hypixelStats",
-    version: "0.1.2",
-    description: "Bedwars, SkyWars and Duels stats from the Hypixel API.",
+    version: "0.1.3",
+    description: "Stats from the Hypixel API, every game it reports on.",
 
     defaultConfig: {
         enabled: true,
@@ -102,15 +112,7 @@ export const hypixelStatsPlugin: Plugin = {
                     if (result.status === "no_data") return tags.nickTags("via Hypixel API"); // apply nick tag when no data available, ie. uuid doesnt exist on hypixel api - shouldnt usually be hit since it'll be detected via uuid check
                     return null;
                 }
-                return [
-                    ...tags.bedwarsTags(result.player), 
-                    ...tags.skywarsTags(result.player), 
-                    ...tags.duelsTags(result.player), 
-                    ...tags.uhcTags(result.player), 
-                    ...tags.tntgamesTags(result.player), 
-                    ...tags.murdermysteryTags(result.player),
-                    ...tags.fishingTags(result.player),
-                ];
+                return tags.allTags(result.player);
             },
         });
 
@@ -137,7 +139,7 @@ export const hypixelStatsPlugin: Plugin = {
                 if (!found) return;
                 const s = bedwarsStats(found.player);
                 session.chat.text(`${PREFIX} ${found.title} §7- §bBedwars`);
-                session.chat.text(`  §7Star: ${formatStar(s.level)}  §7FKDR: ${formatFkdr(s.fkdr)}  §7WLR: ${c("white", s.wlr)}  §7KDR: ${c("white", s.kdr)}`);
+                session.chat.text(`  §7Star: ${bedwarsStar(s.level).formatted}  §7FKDR: ${tierFormat(s.fkdr, BEDWARS_FKDR)}  §7WLR: ${c("white", s.wlr)}  §7KDR: ${c("white", s.kdr)}`);
                 session.chat.text(`  §7Finals: ${c("white", s.finalKills)}  §7Wins: ${c("white", s.wins)}  §7Winstreak: ${c("white", s.winstreak)}`);
             },
             "Bedwars stats for a player (or yourself)",
@@ -150,7 +152,7 @@ export const hypixelStatsPlugin: Plugin = {
                 if (!found) return;
                 const s = skywarsStats(found.player);
                 session.chat.text(`${PREFIX} ${found.title} §7- §bSkyWars`);
-                session.chat.text(`  §7Level: ${s.levelFormatted || c("gray", "none")}  §7KDR: ${c("white", s.kdr)}  §7WLR: ${c("white", s.wlr)}`);
+                session.chat.text(`  §7Level: ${s.levelFormatted || c("gray", "none")}  §7KDR: ${tierFormat(s.kdr, SKYWARS_KDR)}  §7WLR: ${c("white", s.wlr)}`);
                 session.chat.text(`  §7Wins: ${c("white", s.wins)}  §7Kills: ${c("white", s.kills)}`);
             },
             "SkyWars stats for a player (or yourself)",
@@ -181,7 +183,7 @@ export const hypixelStatsPlugin: Plugin = {
                 }
 
                 session.chat.text(`${PREFIX} ${found.title} §7- §bDuels`);
-                session.chat.text(`  §7Wins: ${c("white", s.wins)}  §7WLR: ${c("white", s.wlr)}  §7KDR: ${c("white", s.kdr)}  §7Winstreak: ${c("white", s.winstreak)}`);
+                session.chat.text(`  §7Wins: ${tierFormat(s.wins, DUELS_WINS)}  §7WLR: ${tierFormat(s.wlr, DUELS_WLR)}  §7KDR: ${c("white", s.kdr)}  §7Winstreak: ${c("white", s.winstreak)}`);
                 session.chat.text(`  §7Modes: §f${Object.keys(modes).slice(0, 8).join("§7, §f") || "(none)"}`);
             },
             "Duels stats for a player, optionally a single gamemode",
@@ -198,7 +200,7 @@ export const hypixelStatsPlugin: Plugin = {
                     session.chat.text(`  §7No UHC stats`);
                     return;
                 }
-                session.chat.text(`  §7Wins: ${uhc.formatWins(s.wins)}  §7KDR: ${uhc.formatKdr(s.kdr)}  §7Score: ${c("white", s.score)}`);
+                session.chat.text(`  §7Wins: ${tierFormat(s.wins, UHC_WINS)}  §7KDR: ${tierFormat(s.kdr, UHC_KDR)}  §7Score: ${c("white", s.score)}`);
                 session.chat.text(`  §7Kills: ${c("white", s.kills)}  §7Deaths: ${c("white", s.deaths)}  §7Heads eaten: ${c("white", s.headsEaten)}`);
             },
             "UHC stats for a player (or yourself)",
@@ -216,8 +218,8 @@ export const hypixelStatsPlugin: Plugin = {
                 }
                 // no losses are reported anywhere in tnt, so this breaks the wins
                 // down per mode instead of showing a ratio it cannot work out
-                session.chat.text(`  §7Wins: ${tnt.formatWins(s.wins)}  §7Winstreak: ${c("white", s.winstreak)}`);
-                session.chat.text(`  §7TNT Run: ${tnt.formatTntRun(s.tntRun)}  §7PvP Run: ${c("white", s.pvpRun)}  §7Bow Spleef: ${c("white", s.bowSpleef)}`);
+                session.chat.text(`  §7Wins: ${tierFormat(s.wins, TNT_TOTAL_WINS)}  §7Winstreak: ${c("white", s.winstreak)}`);
+                session.chat.text(`  §7TNT Run: ${tierFormat(s.tntRun, TNT_RUN_WINS)}  §7PvP Run: ${c("white", s.pvpRun)}  §7Bow Spleef: ${c("white", s.bowSpleef)}`);
                 session.chat.text(`  §7TNT Tag: ${c("white", s.tntTag)}  §7Wizards: ${c("white", s.wizards)}`);
             },
             "TNT Games stats for a player (or yourself)",
@@ -233,7 +235,7 @@ export const hypixelStatsPlugin: Plugin = {
                     session.chat.text(`  §7No Murder Mystery stats`);
                     return;
                 }
-                session.chat.text(`  §7Wins: ${mm.formatWins(s.wins)}  §7WLR: ${mm.formatWlr(s.wlr)}  §7KDR: ${c("white", s.kdr)}`);
+                session.chat.text(`  §7Wins: ${tierFormat(s.wins, MM_WINS)}  §7WLR: ${tierFormat(s.wlr, MM_WLR)}  §7KDR: ${c("white", s.kdr)}`);
                 session.chat.text(`  §7Games: ${c("white", s.games)}  §7As murderer: ${c("white", s.murdererWins)}  §7As detective: ${c("white", s.detectiveWins)}`);
             },
             "Murder Mystery stats for a player (or yourself)",
@@ -249,7 +251,7 @@ export const hypixelStatsPlugin: Plugin = {
                     session.chat.text(`  §7No Lobby Fishing stats`);
                     return;
                 }
-                session.chat.text(`  §7Mythical: ${fish.formatMythical(s.mythicalCaught)}  §7Catches: ${fish.formatCatches(s.totalCatches)}  §7Special: ${c("white", s.specialCaught)}`);
+                session.chat.text(`  §7Mythical: ${tierFormat(s.mythicalCaught, FISHING_MYTHICAL)}  §7Catches: ${tierFormat(s.totalCatches, FISHING_CATCHES)}  §7Special: ${c("white", s.specialCaught)}`);
                 session.chat.text(`  §7Fish: ${c("white", s.fishCaught.toLocaleString())}  §7Treasure: ${c("white", s.treasureCaught.toLocaleString())}  §7Junk: ${c("white", s.junkCaught.toLocaleString())}`);
                 session.chat.text(`  §7Plants: ${c("white", s.plantsCaught.toLocaleString())}  §7Creatures: ${c("white", s.creaturesCaught.toLocaleString())}`);
                 
