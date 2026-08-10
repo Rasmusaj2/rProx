@@ -9,11 +9,14 @@ export type GameMode = // this is kinda annoying to keep as a string union shoul
 | "duels" 
 | "murdermystery"
 | "blitz"
-| "buildbattle"
 | "cvc"
 | "megawalls"
 | "smashheroes"
 | "warlords"
+
+// build battle
+| "buildbattle"
+| "guessthebuild"
 
 // uhc
 | "uhc"
@@ -25,6 +28,7 @@ export type GameMode = // this is kinda annoying to keep as a string union shoul
 | "tnttag"
 | "pvprun"
 | "tntwizards"
+| "bowspleef"
 
 // wool games
 | "woolgames"
@@ -83,12 +87,14 @@ const TITLES: Array<[pattern: RegExp, game: GameMode]> = [
     [/DUELS?/, "duels"],
     [/MURDER\s*MYSTERY/, "murdermystery"],
     [/BLITZ\s*SG/, "blitz"],
-    [/BUILD\s*BATTLE/, "buildbattle"],
     [/COPS\s*AND\s*CRIMS/, "cvc"],
     [/MEGA\s*WALLS?/, "megawalls"],
     [/SMASH\s*HEROES?/, "smashheroes"],
     [/WARLORDS?/, "warlords"],
 
+
+    [/BUILD\s*BATTLE/, "buildbattle"],
+    [/GUESS\s*THE\s*BUILD/, "guessthebuild"],
     
     [/SPEED\s*UHC/, "speeduhc"],
     [/UHC/, "uhc"],
@@ -99,6 +105,7 @@ const TITLES: Array<[pattern: RegExp, game: GameMode]> = [
     [/TNT\s*TAG/, "tnttag"],
     [/PVP\s*RUN/, "pvprun"],
     [/TNT\s*WIZARDS?/, "tntwizards"],
+    [/BOW\s*SPLEEF/, "bowspleef"],
 
 
     [/WOOL\s*GAMES?/, "woolgames"],

@@ -44,9 +44,6 @@ export const FISHING_CATCHES = countTiers(500, 2500, 10000, 25000, 60000, 150000
 export const BLITZ_WINS = countTiers(10, 50, 150, 400, 1000, 2500);
 export const BLITZ_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
 
-export const BUILDBATTLE_WINS = countTiers(25, 100, 250, 600, 1500, 3000);
-export const BUILDBATTLE_SCORE = countTiers(2500, 10000, 25000, 50000, 100000, 250000);
-
 export const CVC_WINS = countTiers(25, 100, 250, 750, 1500, 3000);
 export const CVC_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
 
@@ -58,6 +55,12 @@ export const SMASH_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
 
 export const WARLORDS_WINS = countTiers(25, 100, 300, 750, 2000, 5000);
 export const WARLORDS_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
+
+export const BUILDBATTLE_WINS = countTiers(25, 100, 250, 600, 1500, 3000);
+export const BUILDBATTLE_SCORE = countTiers(2500, 10000, 25000, 50000, 100000, 250000);
+export const GUESSTHEBUILD_WINS = countTiers(25, 100, 250, 600, 1500, 3000);
+export const GUESSTHEBUILD_SCORE = countTiers(2500, 10000, 25000, 50000, 100000, 250000);
+
 
 // uhc
 export const UHC_WINS = countTiers(5, 15, 40, 100, 250, 500);
@@ -72,7 +75,7 @@ export const TNT_RUN_WINS = countTiers(25, 100, 250, 750, 1500, 3000);
 export const PVPRUN_WINS = countTiers(10, 50, 150, 400, 1000, 2500);
 export const TNTTAG_WINS = countTiers(25, 100, 300, 800, 2000, 4000); 
 export const WIZARDS_WINS = countTiers(10, 50, 150, 400, 1000, 2500);
-
+export const BOWSPLEEF_WINS = countTiers(10, 50, 150, 400, 1000, 2500);
 
 // wool games
 // i define 2 for each here but i might end up only using one cause of stars

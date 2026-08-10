@@ -402,6 +402,13 @@ const SPECS = {
         trail: { label: "Score", keys: ["score"], tiers: tiers.BUILDBATTLE_SCORE, mark: "S", big: true },
         lines: [count("Games", "games_played"), count("Guesses", "correct_guesses"), count("Pro wins", "wins_solo_pro")],
     },
+    guessthebuild: {
+        title: "Guess the Build",
+        block: "BuildBattle",
+        head: wins(tiers.GUESSTHEBUILD_WINS, "wins_guess_the_build"),
+        trail: { label: "Score", keys: ["score_guess_the_build"], tiers: tiers.GUESSTHEBUILD_SCORE, mark: "S", big: true },
+        lines: [count("Games", "games_played_guess_the_build"), count("Guesses", "correct_guesses_guess_the_build")],
+    },
     cvc: {
         title: "Cops and Crims",
         block: "MCGO",
@@ -465,6 +472,12 @@ const SPECS = {
         block: "TNTGames",
         head: wins(tiers.WIZARDS_WINS, "wins_tntwizards"),
         lines: [count("Kills", "kills_capture"), count("Deaths", "deaths_capture"), count("Points", "points_capture")],
+    },
+    bowspleef: {
+        title: "Bow Spleef",
+        block: "TNTGames",
+        head: wins(tiers.BOWSPLEEF_WINS, "wins_bowspleef"),
+        lines: [count("Kills", "kills_bowspleef"), count("Deaths", "deaths_bowspleef")],
     },
 
     // arcade
@@ -777,7 +790,7 @@ const BY_HAND = [
 
 type Handled =
     | "bedwars" | "skywars" | "duels" | "uhc" | "tntgames" | "murdermystery" | "lobby"
-    | "woolgames" | "woolwars" | "sheepwars" | "ctw" | "arcade" | "classic"
+    | "woolgames" | "woolwars" | "sheepwars" | "ctw" | "arcade" | "classic" 
     | keyof typeof SPECS;
 
 // adding a game to GameMode without giving it tags turns this line red.
