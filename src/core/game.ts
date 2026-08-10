@@ -141,7 +141,7 @@ const TITLES: Array<[pattern: RegExp, game: GameMode]> = [
     [/ARENA/, "arena"],
     [/THE\s*WALLS?/, "thewalls"],
     [/VAMPIREZ?/, "vampirez"],
-    [/TOWER\s*KART\s*RACERS/, "tkr"],
+    [/TURBO\s*KART\s*RACERS/, "tkr"],
     [/PAINTBALL/, "paintball"],
 
 
