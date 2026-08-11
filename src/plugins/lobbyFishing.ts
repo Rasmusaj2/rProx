@@ -1,7 +1,8 @@
 import { PREFIX, component, componentToLegacy } from "../core/chat";
 import { BossBarInjector, type BossBarMode, type BossEntity } from "../core/bossbar";
 import { gameFromTitle } from "../core/game";
-import { SIDEBAR_LINES, SidebarInjector } from "../core/sidebar";
+import { SIDEBAR_LINES } from "../core/sidebar";
+import { SidebarApi } from "../interface/sidebarApi";
 import {
     DEFAULT_HEAT,
     MythicalFight,
@@ -101,8 +102,7 @@ interface SessionState {
     totals: CatchTotals;
     mythicals: MythicalTotals; // which orbs, for the //session hover
     startedAt?: number; // starts at first catch
-    sidebar: SidebarInjector;
-    flush?: NodeJS.Immediate;
+    sidebar: SidebarApi;
     dumped?: boolean; // logged this lobbys rows already
     bossbar: BossBarInjector;
     fight: MythicalFight;
@@ -194,11 +194,17 @@ export const lobbyFishingPlugin: Plugin = {
             colors[key] = COLOR_CODES[color ?? DEFAULT_COLORS[key]];
         }
 
-        const stateFor = (id: string): SessionState => {
-            let state = sessions.get(id);
+        // the api writes to the client itself, so it needs the session rather
+        // than being handed one a packet at a time
+        const stateFor = (session: Session): SessionState => {
+            let state = sessions.get(session.id);
             if (!state) {
-                const sidebar = new SidebarInjector(maxLines);
-                sidebar.omit(hidden);
+                const sidebar = new SidebarApi(session, {
+                    maxLines,
+                    onError: (error) => api.log.debug(`sidebar update failed: ${error}`),
+                });
+                for (const pattern of hidden) sidebar.removeLines(pattern);
+                sidebar.setEnabled(false);
                 state = {
                     totals: emptyTotals(),
                     mythicals: {},
@@ -206,7 +212,7 @@ export const lobbyFishingPlugin: Plugin = {
                     bossbar: new BossBarInjector({ mode: bossBarMode, entity: bossEntity }),
                     fight: new MythicalFight(heat),
                 };
-                sessions.set(id, state);
+                sessions.set(session.id, state);
             }
             return state;
         };
@@ -225,50 +231,36 @@ export const lobbyFishingPlugin: Plugin = {
 
         const showable = (state: SessionState): boolean =>
             useSidebar &&
-            totalCatches(state.totals) > 0 && 
-            gameFromTitle(state.sidebar.title ?? "") === "lobby";
+            totalCatches(state.totals) > 0 &&
+            gameFromTitle(state.sidebar.serverTitle ?? "") === "lobby";
 
-        function schedule(session: Session, state: SessionState): void {
-            if (state.flush) return;
-            state.flush = setImmediate(() => {
-                state.flush = undefined;
-                const drawing = showable(state);
-                // hideRows is only as good as the text it is matched against, so
-                // put that text in the log once per lobby to compare it to
-                if (drawing && !state.dumped) {
-                    state.dumped = true;
-                    for (const row of state.sidebar.rows()) {
-                        api.log.debug(`sidebar ${String(row.score).padStart(3)} ${JSON.stringify(row.text)}`); // lmao this prints emojis in consle
-                    }
+        // say what we want up there. the api coalesces the packets itself, so
+        // this is safe to call as often as something worth redrawing happens
+        function refresh(state: SessionState): void {
+            const drawing = showable(state);
+            // hideRows is only as good as the text it is matched against, so
+            // put that text in the log once per lobby to compare it to
+            if (drawing && !state.dumped) {
+                state.dumped = true;
+                for (const row of state.sidebar.serverRows()) {
+                    api.log.debug(`sidebar ${String(row.score).padStart(3)} ${JSON.stringify(row.text)}`); // lmao this prints emojis in consle
                 }
-                state.sidebar.set(drawing ? sidebarLines(state) : []);
-                try {
-                    state.sidebar.flush((name, data) => session.sendPacket(name, data));
-                } catch (error) {
-                    api.log.debug(`sidebar update failed: ${error}`);
-                }
-            });
+            }
+            state.sidebar.setEnabled(drawing);
+            if (drawing) state.sidebar.setLines(sidebarLines(state));
         }
 
         api.on("serverPacket", (name, data, session) => {
-            const state = stateFor(session.id);
-            try {
-                if (name === "scoreboard_objective") state.sidebar.applyObjective(data);
-                else if (name === "scoreboard_display_objective") state.sidebar.applyDisplayObjective(data);
-                else if (name === "scoreboard_score") state.sidebar.applyScore(data);
-                else if (name === "scoreboard_team") state.sidebar.applyTeam(data);
-                else if (name === "login") {
-                    // hypixel moves you between lobbies with a fresh login packet
-                    // and the client bins its scoreboard when one lands
-                    state.sidebar.clear();
-                    state.dumped = false;
-                    return;
-                } else return;
-            } catch (error) {
-                api.log.debug(`${name} handling failed: ${error}`);
+            const state = stateFor(session);
+            if (!state.sidebar.handlePacket(name, data)) return;
+            if (name === "login") {
+                // a new lobby is a fresh set of rows worth logging again
+                state.dumped = false;
                 return;
             }
-            schedule(session, state);
+            // the rates are time based, so the rows get rebuilt against whatever
+            // hypixel just sent rather than left to go stale
+            refresh(state);
         });
 
         // what the bar says
@@ -353,7 +345,7 @@ export const lobbyFishingPlugin: Plugin = {
         // fight on entities since its not announced in chat
         api.on("serverPacket", (name, data, session) => {
             if (!trackFight) return;
-            const state = stateFor(session.id);
+            const state = stateFor(session);
             const now = Date.now();
             try {
                 switch (name) {
@@ -429,7 +421,7 @@ export const lobbyFishingPlugin: Plugin = {
 
         api.on("clientPacket", (name, data, session) => {
             if (!trackFight) return;
-            const state = stateFor(session.id);
+            const state = stateFor(session);
             try {
                 // a wither only draws a bar while it is in shot, so where the player
                 // is looking is as load bearing as where they are standing
@@ -455,7 +447,7 @@ export const lobbyFishingPlugin: Plugin = {
         api.on("chat", (msg, session) => {
             const caught = parseCatch(msg.formatted);
             if (!caught) return;
-            const state = stateFor(session.id);
+            const state = stateFor(session);
             state.totals[caught.kind]++;
             state.startedAt ??= Date.now();
             if (caught.orb) recordMythical(state.mythicals, caught.orb, caught.weight);
@@ -470,25 +462,27 @@ export const lobbyFishingPlugin: Plugin = {
                 }
                 state.fight.end();
             }
-            schedule(session, state);
+            refresh(state);
         });
 
         api.on("sessionEnd", (session) => {
             const state = sessions.get(session.id);
-            if (state?.flush) clearImmediate(state.flush);
-            if (state) stopTicker(state);
+            if (state) {
+                state.sidebar.dispose();
+                stopTicker(state);
+            }
             sessions.delete(session.id);
         });
 
         api.registerCommand(
             "session",
             (args, session) => {
-                const state = stateFor(session.id);
+                const state = stateFor(session);
                 if (args[0]?.toLowerCase() === "reset") {
                     state.totals = emptyTotals();
                     state.mythicals = {};
                     state.startedAt = undefined;
-                    schedule(session, state);
+                    refresh(state);
                     session.chat.text(`${PREFIX} §7Session catches reset.`);
                     return;
                 }
@@ -527,7 +521,7 @@ export const lobbyFishingPlugin: Plugin = {
             api.registerCommand(
                 "bossbar",
                 (args, session) => {
-                    const state = stateFor(session.id);
+                    const state = stateFor(session);
                     const send = (name: string, data: unknown) => session.sendPacket(name, data);
                     const sub = args[0]?.toLowerCase() ?? "info";
                     switch (sub) {
