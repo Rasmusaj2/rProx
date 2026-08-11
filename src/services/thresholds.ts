@@ -15,7 +15,7 @@ export function tierColor(num: number, thresholds: Thresholds): McColorName {
 
 
 export function tierFormat(num: number, thresholds: Thresholds, text: string | number = num): string {
-    return COLOR_CODES[tierColor(num, thresholds)] + text.toLocaleString();
+    return COLOR_CODES[tierColor(num, thresholds)] + (typeof text === "number" ? text.toLocaleString() : text);
 }
 
 // lowkey idk why they have different colors
