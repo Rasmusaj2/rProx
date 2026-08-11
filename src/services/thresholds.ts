@@ -84,7 +84,7 @@ export const WOOL_WARS_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
 export const SHEEPWARS_WINS = countTiers(10, 50, 150, 400, 1000, 2500);
 export const SHEEPWARS_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
 export const CTW_WINS = countTiers(5, 25, 75, 200, 500, 1000); // ctw games run long, nobody has thousands
-export const CTW_KDR = countTiers(1, 5, 15, 40, 100, 250);
+export const CTW_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
 
 
 // arcade
