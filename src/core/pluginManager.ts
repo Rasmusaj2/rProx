@@ -1,9 +1,12 @@
 import { readdirSync, existsSync } from "node:fs";
-import { resolve, join, extname } from "node:path";
+import { join, extname } from "node:path";
+import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { createLogger } from "../util/log";
+import { fromBase, isPackaged } from "../util/paths";
 import type { HttpClient } from "../util/http";
 import { applyPluginDefaults, saveConfig, type Config } from "../config";
+import { installHostModules } from "./pluginHost";
 import type { EventBus } from "./events";
 import type { EnrichmentEngine } from "./enrichment";
 import type { ChatFilter, ChatMessage, CommandHandler, Plugin, PluginApi, Session } from "./types";
@@ -107,14 +110,38 @@ export class PluginManager {
         this.persistDefaults();
     }
 
+    // a plugin file off the disk. require over import wherever we can, because a
+    // packaged exe runs a snapshot node with no dynamic import at all, while
+    // require falls through to the real filesystem beside the exe just fine
+    private static async importPlugin(path: string): Promise<any> {
+        if (extname(path) !== ".mjs") {
+            try {
+                // resolved as if from the plugin file, so its own relative requires
+                // and any node_modules it sits next to still work
+                return createRequire(path)(path);
+            } catch (error) {
+                // a .js plugin written as esm, ie one with a package.json of type module beside it
+                if ((error as NodeJS.ErrnoException)?.code !== "ERR_REQUIRE_ESM") throw error; // honestly dont know what this does
+            }
+        }
+        if (isPackaged()) {
+            throw new Error("esm plugins cannot be loaded from a packaged build, write it as commonjs (module.exports)");
+        }
+        return import(pathToFileURL(path).href);
+    }
+
     // drop-in plugins from the configured directory
     async loadExternal(): Promise<void> {
-        const dir = resolve(process.cwd(), this.config.pluginDirectory);
+        const dir = this.externalDir();
         if (!existsSync(dir)) return;
-        const files = readdirSync(dir).filter((file) => [".js", ".mjs", ".cjs", ".ts"].includes(extname(file)));
-        for (const file of files) {
+        installHostModules(); // before anything requires "rprox"
+        for (const file of this.availableExternal()) {
+            if (extname(file) === ".ts" && isPackaged()) {
+                log.warn(`ignoring ${file}, a packaged build has no typescript compiler - ship it as .js`);
+                continue;
+            }
             try {
-                const mod = await import(pathToFileURL(join(dir, file)).href);
+                const mod = await PluginManager.importPlugin(join(dir, file));
                 const plugin: Plugin = mod.default ?? mod.plugin ?? mod;
                 if (!plugin?.name || typeof plugin.setup !== "function") {
                     log.warn(`ignoring ${file}, not a valid plugin (needs { name, setup })`);
@@ -128,11 +155,17 @@ export class PluginManager {
         this.persistDefaults();
     }
 
+    private externalDir(): string {
+        return fromBase(this.config.pluginDirectory);
+    }
+
     // what the plugin directory has to offer, loaded or not
     availableExternal(): string[] {
-        const dir = resolve(process.cwd(), this.config.pluginDirectory);
+        const dir = this.externalDir();
         if (!existsSync(dir)) return [];
-        return readdirSync(dir).filter((file) => [".js", ".mjs", ".cjs", ".ts"].includes(extname(file)));
+        return readdirSync(dir).filter(
+            (file) => [".js", ".mjs", ".cjs", ".ts"].includes(extname(file)) && !file.endsWith(".d.ts"), // a .d.ts is types for the author, not a plugin
+        );
     }
 
     getCommand(name: string): RegisteredCommand | undefined {

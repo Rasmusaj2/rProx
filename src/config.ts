@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { createLogger } from "./util/log";
+import { fromBase } from "./util/paths";
 
 const log = createLogger("config");
 
@@ -78,7 +78,7 @@ function deepMerge<T>(base: T, override: unknown): T {
 }
 
 export function configPath(): string {
-    return resolve(process.cwd(), CONFIG_FILE);
+    return fromBase(CONFIG_FILE);
 }
 
 function readJson(path: string): unknown {
@@ -105,7 +105,7 @@ export function loadConfig(): Config {
     if (existsSync(path)) return deepMerge(baseConfig(), readJson(path));
 
     // write if doesnt exist
-    const fallback = resolve(process.cwd(), FALLBACK_FILE); // a shipped default, if there is one
+    const fallback = fromBase(FALLBACK_FILE); // a shipped default, if there is one
     const config = existsSync(fallback) ? deepMerge(baseConfig(), readJson(fallback)) : baseConfig();
     if (saveConfig(config)) {
         log.info(`no ${CONFIG_FILE} found, generated one${existsSync(fallback) ? ` from ${FALLBACK_FILE}` : ""}`);

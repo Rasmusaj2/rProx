@@ -188,3 +188,14 @@ module.exports = {
 A plugin without a `defaultConfig` still gets an `"enabled": true` block written for it, so anything in the directory can be switched off from `config.json`.
 
 ⚠️ **Please be aware that plugins can execute arbitrary code on your machine. Only install plugins you trust.**
+
+#### Proxy Apis for plugins
+
+Higher level helpers like the sidebar api are handed out by the proxy under the
+name `rprox`, so a plugin never has to know where they sit on disk:
+
+```js
+const { createSidebarApi, colors } = require("rprox"); // or "rprox/sidebar", "rprox/colors" if you wish to import only certain functionality.
+```
+
+Do not require them by path. `require("../src/interface/sidebarApi")` only works when running from source, not as a packaged `.exe` 

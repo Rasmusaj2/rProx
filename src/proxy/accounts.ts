@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { createLogger, type Logger } from "../util/log";
+import { fromBase } from "../util/paths";
 
 // remembers linked minecraft accounts to uuids and caches their tokens for the proxy to use next login
 // this is not pretty to do in files, but its the simplest way for this scale of proxy, and a db would be overkill for now
@@ -21,7 +22,7 @@ export class AccountStore {
     private readonly log: Logger;
 
     constructor(dir: string, log?: Logger) {
-        this.dir = resolve(process.cwd(), dir);
+        this.dir = fromBase(dir);
         this.file = join(this.dir, "accounts.json");
         this.log = log ?? createLogger("accounts");
         this.load();
