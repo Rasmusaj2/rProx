@@ -2,7 +2,7 @@
 // used to inject custom values and data into the sidebar, which hypixel keeps re-sending its own rows for every time its updated 
 import { stripColorCodes } from "../util/mcColors";
 
-const MAX_ENTRY = 48; // 48 char limit per line
+export const MAX_ENTRY = 40; // 40 char limit per line
 export const SIDEBAR_LINES = 15; // 15 rows limit 16th is title "HYPIXEL"
 const SIDEBAR = 1;
 

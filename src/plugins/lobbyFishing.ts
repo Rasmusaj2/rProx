@@ -1,7 +1,7 @@
 import { PREFIX, component, componentToLegacy } from "../core/chat";
 import { BossBarInjector, type BossBarMode, type BossEntity } from "../core/bossbar";
 import { gameFromTitle } from "../core/game";
-import { SIDEBAR_LINES } from "../core/sidebar";
+import { MAX_ENTRY, SIDEBAR_LINES } from "../core/sidebar";
 import { SidebarApi } from "../interface/sidebarApi";
 import {
     DEFAULT_HEAT,
@@ -114,6 +114,8 @@ interface SessionState {
 // and doing more lines would override the built in hypixel fishing lines which we dont want to lose.
 // the middle row is whichever of fish or plants the session has more
 // plants show up on fishing friday from what i can tell ? might be wrong
+const SESSION_WORDS = ["Session", "S."]; // fallback to shorthand if the lines get too long
+
 function rowsFor(totals: CatchTotals): Array<[key: RowKey, label: string, value: number]> {
     const headline: CatchKind = totals.plant > totals.fish ? "plant" : "fish";
     return [
@@ -221,10 +223,17 @@ export const lobbyFishingPlugin: Plugin = {
 
         function sidebarLines(state: SessionState): string[] {
             const elapsed = elapsedOf(state);
-            const rows = rowsFor(state.totals).map(
-                ([key, label, value]) =>
-                    `§fSession ${label}: ${colors[key]}${formatCount(value)} §8(§7${formatRate(value, elapsed)}/h§8)`,
-            );
+            const totals = rowsFor(state.totals);
+            const build = (word: string): string[] =>
+                totals.map(
+                    ([key, label, value]) =>
+                        `§f${word} ${label}: ${colors[key]}${formatCount(value)} §8(§7${formatRate(value, elapsed)}/h§8)`,
+                );
+            let rows = build(SESSION_WORDS[0]);
+            for (const word of SESSION_WORDS.slice(1)) {
+                if (rows.every((row) => row.length <= MAX_ENTRY)) break;
+                rows = build(word);
+            }
             // the blank sits above our block so hypixels rows dont run into ours.
             return useSpacer ? [" ", ...rows] : rows;
         }
