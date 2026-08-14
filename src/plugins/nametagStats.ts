@@ -90,35 +90,41 @@ function buildSuffix(tags: Tag[], budget: number): string {
     return out;
 }
 
-// bracketed prefix, e.g. "§8[§b✫312§8] "
-// budget cap can be hit by a single tag, so we try the full form first, then the compact form, then drop tags until it fits. if nothing fits, return the empty string
-function buildPrefix(tags: Tag[], budget = Infinity): string {
+// budget capping stuff for above-head nametags is a bit more complicated than the tab list
+const PREFIX_WRAPS: Array<(parts: string[]) => string> = [
+    (parts) => `§8[${parts.join("§8 ")}§8] `, // "§8[§b✫312§8] "
+    (parts) => `${parts.join(" ")} `, // "§b✫312 "
+];
+
+function fitPrefix(tags: Tag[], budget = Infinity): { text: string; dropped: Tag[] } {
     const wanted = visibleTags(tags);
-    const wrap = (parts: string[]) => (parts.length ? `§8[${parts.join("§8 ")}§8] ` : "");
-    for (const compact of [false, true]) {
-        const out = wrap(wanted.map((tag) => renderTag(tag, compact)));
-        if (out && out.length <= budget) return out;
+    for (let count = wanted.length; count > 0; count--) {
+        const kept = wanted.slice(0, count);
+        for (const wrap of PREFIX_WRAPS) {
+            for (const compact of [false, true]) {
+                const out = wrap(kept.map((tag) => renderTag(tag, compact)));
+                if (out.length <= budget) return { text: out, dropped: wanted.slice(count) };
+            }
+        }
     }
-    const parts = wanted.map((tag) => renderTag(tag, true));
-    while (parts.length) {
-        parts.pop();
-        const out = wrap(parts);
-        if (out.length <= budget) return out;
-    }
-    return "";
+    return { text: "", dropped: wanted };
 }
 
 // the pair of builders a name gets decorated with
 // use factory-ish patterns to have different renderers for each gamemode
 interface NametagRenderer {
-    prefix(tags: Tag[], budget?: number): string;
-    suffix(tags: Tag[], budget: number): string;
+    prefix(tags: Tag[], budget?: number): { text: string; dropped: Tag[] };
+    suffix(tags: Tag[], budget: number, extra?: Tag[]): string;
 }
 
 function makeRenderer(game: GameMode): NametagRenderer {
+    const forGame = (tags: Tag[]) => tagsForGame(tags, game);
     return {
-        prefix: (tags, budget) => buildPrefix(tagsForGame(tags, game).filter((t) => t.prefix), budget),
-        suffix: (tags, budget) => buildSuffix(tagsForGame(tags, game).filter((t) => !t.prefix), budget),
+        prefix: (tags, budget) => fitPrefix(forGame(tags).filter((t) => t.prefix), budget),
+        // extra is whatever the prefix could not hold, and it outranks the real
+        // suffix tags on priority so it lands nearest the name
+        suffix: (tags, budget, extra = []) =>
+            buildSuffix([...extra, ...forGame(tags).filter((t) => !t.prefix)], budget),
     };
 }
 
@@ -483,7 +489,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     }
 
                     const render = rendererFor(state.games.game);
-                    const prefix = render.prefix(tags);
+                    const { text: prefix } = render.prefix(tags);
                     const suffix = render.suffix(tags, MAX_TAB_SUFFIX);
                     // no reason to send a packet if nothing changed
                     if (!prefix && !suffix && !current.applied) return;
@@ -689,10 +695,10 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     // budget the color back in up front so a prefix that doesnt fit
                     // sheds its lowest priority tag instead of dropping out whole
                     const ours = render.prefix(tags, MAX_TEAM_FIELD - tail.length);
-                    const prefix = ours ? ours + tail : current.serverPrefix;
+                    const prefix = ours.text ? ours.text + tail : current.serverPrefix;
                     const suffix =
                         current.serverSuffix +
-                        render.suffix(tags, Math.max(0, MAX_TEAM_FIELD - current.serverSuffix.length));
+                        render.suffix(tags, Math.max(0, MAX_TEAM_FIELD - current.serverSuffix.length), ours.dropped);
 
                     // a player with nothing to show leaves the team exactly as the
                     // server sent it, so dont claim it as ours or we end up reverting
