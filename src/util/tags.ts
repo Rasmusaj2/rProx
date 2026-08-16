@@ -103,9 +103,11 @@ export const duelsTags = (player: HypixelPlayer): Tag[] => {
     return gameTags(
         "duels",
         [
-            `§7Duels ${wins.formatted}`,
+            `§7Duels ${wins.formatted}${s.division ? ` §8(${s.division.label})` : ""}`,
             `§7WLR: ${wlr.formatted}   §7KDR: ${w(s.kdr)}`,
-            `§7Winstreak: ${w(s.winstreak)}`,
+            s.winstreaksHidden
+                ? `§7Winstreak: §8hidden`
+                : `§7Winstreak: ${w(s.currentWinstreak)}   §7Best: ${w(s.bestWinstreak)}`,
         ],
         wins,
         wlr,

@@ -34,6 +34,9 @@ export const SKYWARS_KDR = ratioTiers(0.75, 1.5, 3, 5, 8, 12);
 
 export const DUELS_WINS = countTiers(100, 500, 1000, 2000, 5000, 10000);
 export const DUELS_WLR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
+export const DUELS_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
+export const DUELS_MODE_WINS = countTiers(50, 250, 500, 1000, 5000, 10000); // per mode, so it sits where the division titles do
+export const DUELS_DIVISION = countTiers(1, 2, 4, 6, 8, 10);
 
 export const MM_WINS = countTiers(50, 150, 400, 1000, 2500, 5000);
 export const MM_WLR = ratioTiers(0.2, 0.4, 0.7, 1.2, 2, 3);
