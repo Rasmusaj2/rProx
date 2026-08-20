@@ -9,6 +9,7 @@ interface AntiAfkConfig {
     messageLength?: number;
     hideMessages?: boolean; // swallow the To/From echo
     autoStart?: boolean; // start on join, or wait for //afk
+    lobbyOnly?: boolean;
     targetUser?: string | null; // use a targetUser instead of yourself for the DM, lets you avoid the "pling" on dm
 }
 
@@ -47,6 +48,7 @@ export const antiAfkPlugin: Plugin = {
         messageLength: DEFAULT_LENGTH,
         hideMessages: true,
         autoStart: true,
+        lobbyOnly: true,
         targetUser: null,
     },
 
@@ -65,6 +67,7 @@ export const antiAfkPlugin: Plugin = {
         }
         const hideMessages = config.hideMessages !== false;
         const autoStart = config.autoStart !== false;
+        const lobbyOnly = config.lobbyOnly !== false;
         const messagePrefix = config.prefix ?? DEFAULT_PREFIX;
 
         const sessions = new Map<string, AfkState>();
@@ -85,6 +88,10 @@ export const antiAfkPlugin: Plugin = {
         const targetOf = (session: Session) => config.targetUser || session.username;
 
         const tick = (session: Session, tokens: string[]): void => {
+            if (lobbyOnly && !session.lobby) {
+                api.log.debug(`skipping anti-afk dm for ${session.username}, in a game`);
+                return;
+            }
             const token = messagePrefix + randomToken(tokens[tokens.length - 1]);
             tokens.push(token);
             if (tokens.length > KEEP_TOKENS) tokens.shift();
@@ -144,7 +151,7 @@ export const antiAfkPlugin: Plugin = {
                     start(session);
                     session.chat.text(
                         `${PREFIX} §aAnti-AFK on §7- messaging §f${config.targetUser || "yourself"}§7 every §f${interval}s` +
-                            `§7${hideMessages ? " §8(echo hidden)" : ""}`,
+                            `§7${lobbyOnly ? " §8(lobbies only)" : ""}${hideMessages ? " §8(echo hidden)" : ""}`,
                     );
                 } else {
                     stop(session.id);
@@ -154,7 +161,9 @@ export const antiAfkPlugin: Plugin = {
             "toggle anti-afk self-messaging, //afk [on|off]",
         );
 
-        api.log.info(`anti-afk ready (${interval}s, ${autoStart ? "auto-start" : "manual"}, echo ${hideMessages ? "hidden" : "shown"})`);
+        api.log.info(
+            `anti-afk ready (${interval}s, ${autoStart ? "auto-start" : "manual"}, ${lobbyOnly ? "lobbies only" : "everywhere"}, echo ${hideMessages ? "hidden" : "shown"})`,
+        );
     },
 };
 
