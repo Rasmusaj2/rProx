@@ -53,6 +53,7 @@ export interface Session {
     readonly username: string;
     readonly chat: ChatInjector;
     game: GameMode; // active game, detected and kept up to date by nametagStats
+    lobby: boolean;
     sendUpstream(message: string): void; // send a message/command as if typed
     sendPacket(name: string, data: unknown): void; // write a decoded packet to the client
     players(): PlayerRef[]; // current tab list, npcs left out

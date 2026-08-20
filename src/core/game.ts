@@ -176,6 +176,19 @@ export function tagsForGame(tags: Tag[], game: GameMode): Tag[] {
     return tags.filter((tag) => !tag.game || tag.game === wanted);
 }
 
+export const WHEREAMI_COMMAND = "/whereami";
+const WHEREAMI = /^You are currently connected to server (\S+?)\.?$/;
+const LOBBY_SERVER = /^(?:dynamic)?lobby/i; 
+
+const WHEREAMI_DELAY_MS = 500;
+
+export interface WhereamiResult {
+    server: string;
+    lobby: boolean;
+    changed: boolean; 
+    ours: boolean; // autorun
+}
+
 interface ObjectivePacket {
     name: string;
     action: number; // 0 create, 1 remove, 2 update
@@ -195,9 +208,21 @@ export class GameTracker {
     private titles = new Map<string, string>(); // objective name -> its display title
     private sidebar?: string; // objective currently shown in the sidebar
     private current: GameMode = "unknown";
+    private lobby: boolean = true;
+    private server?: string; 
+    private awaiting = false;
+    private timer?: NodeJS.Timeout;
 
     get game(): GameMode {
         return this.current;
+    }
+
+    get isLobby(): boolean {
+        return this.lobby;
+    }
+
+    get serverName(): string | undefined {
+        return this.server;
     }
 
     applyObjective(packet: ObjectivePacket): boolean {
@@ -212,6 +237,36 @@ export class GameTracker {
         return this.refresh();
     }
 
+    serverChange(send: (command: string) => void): void {
+        this.server = undefined;
+        this.awaiting = true;
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => send(WHEREAMI_COMMAND), WHEREAMI_DELAY_MS);
+    }
+
+    clientQuery(): void {
+        if (!this.timer) return;
+        clearTimeout(this.timer);
+        this.timer = undefined;
+        this.awaiting = false;
+    }
+
+    applyWhereami(text: string): WhereamiResult | null {
+        const match = WHEREAMI.exec(text.trim());
+        if (!match) return null;
+        clearTimeout(this.timer);
+        this.timer = undefined;
+        const ours = this.awaiting;
+        this.awaiting = false;
+
+        const server = match[1];
+        const lobby = LOBBY_SERVER.test(server);
+        const changed = lobby !== this.lobby;
+        this.server = server;
+        this.lobby = lobby;
+        return { server, lobby, changed, ours };
+    }
+
     private refresh(): boolean {
         const title = this.sidebar ? this.titles.get(this.sidebar) : undefined;
         const next = title ? gameFromTitle(title) : "unknown";
@@ -224,5 +279,9 @@ export class GameTracker {
         this.titles.clear();
         this.sidebar = undefined;
         this.current = "unknown";
+        clearTimeout(this.timer);
+        this.timer = undefined;
+        this.awaiting = false;
+        this.server = undefined;
     }
 }

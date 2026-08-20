@@ -159,6 +159,7 @@ export class ProxyServer {
             username: client.username,
             chat: makeChatInjector(client),
             game: "unknown", // nametagStats fills this in off the scoreboard and we dont have a scoreboard yet - also irrelevant anyways if nametagStats is off
+            lobby: true,
             sendUpstream: (message: string) => {
                 if (target.state === states.PLAY) target.write("chat", { message });
             },

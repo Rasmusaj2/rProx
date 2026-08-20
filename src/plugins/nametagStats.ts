@@ -2,7 +2,7 @@ import type { Collected, EnrichmentEngine } from "../core/enrichment";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
 import { actionName, hasNpcRank } from "../core/lobby";
 import { componentToLegacy } from "../core/chat";
-import { GameTracker, tagsForGame, type GameMode } from "../core/game";
+import { GameTracker, tagsForGame, WHEREAMI_COMMAND, type GameMode } from "../core/game";
 import { dashUuid } from "../services/microsoft";
 import { COLOR_CODES, colorFromCode, lastColor } from "../util/mcColors";
 
@@ -254,8 +254,10 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         // arrives. holding on to ours leaves us decorating teams the
                         // client no longer has, and the dead entries keep counting
                         // against maxTablistPlayers so the new lobby gets skipped
-                        forgetServerState(stateFor(session.id));
+                        const state = stateFor(session.id);
+                        forgetServerState(state);
                         session.game = "unknown";
+                        state.games.serverChange((command) => session.sendUpstream(command));
                     } else if (name === "scoreboard_objective") {
                         if (stateFor(session.id).games.applyObjective(data)) onGameChange(session); // objective title changed, change gamemode 
                     } else if (name === "scoreboard_display_objective") {
@@ -264,6 +266,24 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 } catch (error) {
                     api.log.debug(`${name} handling failed: ${error}`);
                 }
+            });
+
+            api.on("clientPacket", (name, data, session) => {
+                if (name !== "chat" || typeof data?.message !== "string") return;
+                if (WHEREAMI_COMMAND !== data.message.trim().toLowerCase()) return;
+                sessions.get(session.id)?.games.clientQuery();
+            });
+
+            api.registerChatFilter((msg, session) => { // hide response
+                const state = sessions.get(session.id);
+                if (!state) return false;
+                const where = state.games.applyWhereami(msg.text);
+                if (!where) return false;
+                session.lobby = where.lobby;
+                const label = `server ${where.server}, ${where.lobby ? "lobby" : "game"}`;
+                if (where.changed) api.log.info(`on ${label}`);
+                else api.log.debug(`on ${label}`);
+                return where.ours;
             });
 
             // a different game means a different set of stats on every name, so redo everything when the game changes
