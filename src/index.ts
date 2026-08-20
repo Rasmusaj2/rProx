@@ -14,6 +14,7 @@ import { createNametagStatsPlugin } from "./plugins/nametagStats";
 import { dailyRewardsPlugin } from "./plugins/dailyRewards";
 import { antiAfkPlugin } from "./plugins/antiAfk";
 import { lobbyFishingPlugin } from "./plugins/lobbyFishing";
+import { urchinPlugin } from "./plugins/urchin";
 
 async function main(): Promise<void> {
     const config = loadConfig();
@@ -33,6 +34,7 @@ async function main(): Promise<void> {
         dailyRewardsPlugin,
         antiAfkPlugin,
         lobbyFishingPlugin,
+        urchinPlugin,
     ]);
 
     // then whatever is sitting in the plugin directory
