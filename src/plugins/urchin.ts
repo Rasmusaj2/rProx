@@ -32,6 +32,14 @@ const STYLES: Record<string, StyleConfig> = {
 
 const FALLBACK_COLOR: McColorName = "red";
 
+// seraph status tags are not real tags, just to know if a report is confirmed or not
+const SERAPH_VERIFIED = "seraph.verified";
+const SERAPH_PENDING = "seraph.pending";
+const isSeraphStatus = (name: string): boolean => name === SERAPH_VERIFIED || name === SERAPH_PENDING;
+
+// every seraph tag_name is namespaced, ie. "seraph.closet_cheating"
+const stripNamespace = (name: string): string => name.replace(/^seraph\./i, "");
+
 interface StyleConfig {
     label?: string;
     short?: string;
@@ -75,8 +83,8 @@ interface UrchinTag {
 }
 
 interface SeraphTag {
-    tag_name?: string;
-    text?: string;
+    tag_name?: string; // the real name, ie. "seraph.closet_cheating"
+    text?: string; // the short form seraphs own tag column shows, ie. "CC"
     tooltip?: string;
     color?: number;
     textColor?: number;
@@ -94,6 +102,7 @@ interface SeraphResponse {
 interface Hit {
     source: "urchin" | "seraph";
     label: string;
+    note?: string; // extra tooltip line, ie. whether a seraph flag is confirmed yet
     short: string;
     color: McColorName;
     tooltip: string;
@@ -115,7 +124,7 @@ function titleCase(type: string): string {
 
 // initials used for short tag in nametag
 function initials(type: string): string {
-    const words = String(type).split(/[_-]+/).filter(Boolean);
+    const words = String(type).split(/[\s_-]+/).filter(Boolean);
     return words.map((word) => word[0].toUpperCase()).join("") || "?";
 }
 
@@ -123,6 +132,10 @@ function formatDate(millis: number | undefined): string {
     if (!millis) return "unknown";
     const date = new Date(Number(millis));
     return Number.isNaN(date.getTime()) ? "unknown" : date.toISOString().slice(0, 10);
+}
+
+function firstLine(tooltip: string | undefined): string {
+    return String(tooltip ?? "").split(/\r?\n/)[0].trim();
 }
 
 //seraph uses rgb colors 
@@ -457,25 +470,55 @@ export const urchinPlugin: Plugin = {
             });
         }
 
+        // create note for seraph.verified / seraph.pending
+        function seraphStatusNote(tags: SeraphTag[]): string | undefined {
+            let note: string | undefined;
+            for (const tag of tags) {
+                const name = String(tag.tag_name ?? "").trim().toLowerCase();
+                if (!isSeraphStatus(name)) continue;
+
+                const verified = name === SERAPH_VERIFIED;
+                const color = nearestColor(tag.color) ?? nearestColor(tag.textColor) ?? (verified ? "green" : "yellow");
+                const label = firstLine(tag.text) || firstLine(tag.tooltip) || (verified ? "verified" : "pending verification");
+                const detail = firstLine(tag.tooltip);
+                note =
+                    COLOR_CODES[color] +
+                    label +
+                    (detail && detail.toLowerCase() !== label.toLowerCase() ? ` §8- ${detail}` : "");
+                if (verified) break; // if both somehow turn up, confirmed is the one that matters
+            }
+            return note;
+        }
+
         function seraphTagHits(report: SeraphResponse | null): Hit[] {
             if (!report) return [];
             const hits: Hit[] = [];
+            const note = seraphStatusNote(report.tags ?? []);
 
             for (const tag of report.tags ?? []) {
-                const name = String(tag.tag_name ?? tag.text ?? "").trim();
+                const raw = String(tag.tag_name ?? "").trim().toLowerCase();
+                if (isSeraphStatus(raw)) continue;
+                const name = stripNamespace(raw) || firstLine(tag.text);
                 if (!name) continue;
-                if (ignored.has(name.toLowerCase())) continue;
+                if (ignored.has(name) || ignored.has(raw)) continue;
 
-                const label = String(tag.text ?? name).trim() || titleCase(name);
-                const tooltip = [`§f${titleCase(name)}`, `§7${String(tag.tooltip ?? "").trim() || "no detail given"}`, "§8via seraph"]
+                // seraph sends its own 2c short form in the text field, but we dont want to use that for the nametag short, as it can be longer than 4 chars and look bad
+                const label = titleCase(name);
+                const short = firstLine(tag.text) || (label.length <= 4 ? label : initials(label));
+                const tooltip = [
+                    `§f${label}`,
+                    `§7${String(tag.tooltip ?? "").trim() || "no detail given"}`,
+                    note,
+                    "§8via seraph",
+                ]
+                    .filter((line): line is string => Boolean(line))
                     .join("\n");
 
                 hits.push({
                     source: "seraph",
                     label,
-                    // seraph writes for a gui, so a label can be far too wide for a
-                    // nametag prefix - initials stand in when it is
-                    short: label.length <= 3 ? label : initials(name),
+                    note,
+                    short,
                     color: nearestColor(tag.color) ?? nearestColor(tag.textColor) ?? FALLBACK_COLOR,
                     tooltip,
                     priority: SERAPH_PRIORITY, 
@@ -672,7 +715,8 @@ export const urchinPlugin: Plugin = {
                     session.chat.text(`${PREFIX} §f${player.name} §8- ${heading}`);
                     for (const hit of hits) {
                         const reason = hit.tooltip.split("\n")[1] ?? "§7no detail given";
-                        session.chat.text(`  §8• ${COLOR_CODES[hit.color]}${hit.label} §8- ${reason} §8(${hit.source})`);
+                        const note = hit.note ? ` §8[${hit.note}§8]` : "";
+                        session.chat.text(`  §8• ${COLOR_CODES[hit.color]}${hit.label} §8- ${reason}${note} §8(${hit.source})`);
                     }
                 } catch (error) {
                     session.chat.text(`${PREFIX} §cBlacklist lookup failed: §7${error}`);
@@ -701,7 +745,10 @@ export const urchinPlugin: Plugin = {
                         const heading = hits.map((hit) => COLOR_CODES[hit.color] + hit.label).join("§7, ");
                         session.chat.text(`${PREFIX} §f${player.name} §8- ${heading}`);
                         for (const hit of hits) {
-                            session.chat.text(`  §8• ${hit.tooltip.split("\n")[1] ?? "§7no detail given"}`);
+                            const note = hit.note ? ` §8[${hit.note}§8]` : "";
+                            session.chat.text(
+                                `  §8• ${COLOR_CODES[hit.color]}${hit.label} §8- ${hit.tooltip.split("\n")[1] ?? "§7no detail given"}${note}`,
+                            );
                         }
                     }
                     if (typeof score?.value === "number") {
