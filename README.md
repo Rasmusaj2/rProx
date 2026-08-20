@@ -63,7 +63,7 @@ New settings are automatically filled into your config from new updates or plugi
 
 ### Core Plugin Configuration
 
-rProx comes with 6 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing & a daily reward handler
+rProx comes with 7 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing & a daily reward handler
 
 Configuration for these are set in [`config.json`](config.json) section called `builtInPlugins` - This section also works for configuration for external plugins, but the tooling for this is uncomplete.
 
@@ -157,6 +157,34 @@ Can be toggled with `//afk on` & `//afk off`
     "targetUser": null // what user to message. If null, will message yourself.
 }
 ```
+* **Urchin**
+
+Urchin (Coral) & Seraph API support for cheaters
+
+Players can be looked up with `//urchin`
+```json
+"urchin": {
+            "enabled": true,
+            "apiKey": "", // urchin api key gotten through the Urchin discord bot /dashboard
+            "baseUrl": "https://api.urchin.gg",
+            "cacheTtlSeconds": 600,
+            "ignoreTypes": [], // tags to ignore
+            "timeoutMs": 6000,
+            "types": {},
+            "alerts": {
+                "enabled": true, // if chat messages should be sent
+                "onJoin": true, // when a new player joins a lobby
+                "onLobby": true, // when you join a new lobby
+                "repeatSeconds": 300 // gap between sending an alert for the same player
+            },
+            "seraph": {
+                "enabled": true, // use seraph as well
+                "apiKey": "", // seraph api key
+                "baseUrl": "https://api.seraph.si",
+                "scoreFactors": "",
+                "scoreThreshold": 0 // when to show a SNIPER tag based on seraphs sniperr score
+            }
+        }```
 
 ### Extendable plugins
 rProx supports custom Plugins to add extended functionality and stat checking features.
