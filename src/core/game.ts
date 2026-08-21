@@ -213,6 +213,9 @@ export class GameTracker {
     private awaiting = false;
     private timer?: NodeJS.Timeout;
 
+    private lastChange: number | null = null;
+    private lastChangeDelay: number = 0.5 * 1000;
+
     get game(): GameMode {
         return this.current;
     }
@@ -270,6 +273,15 @@ export class GameTracker {
     private refresh(): boolean {
         const title = this.sidebar ? this.titles.get(this.sidebar) : undefined;
         const next = title ? gameFromTitle(title) : "unknown";
+        if (next === "unknown") { // avoid swapping to "unknown" because sidebar drops for a short time (turbo builders start)
+            const currentTime = Date.now();
+            if (this.lastChange === null || currentTime - this.lastChange > this.lastChangeDelay) {
+                this.lastChange = currentTime;
+            } else {
+                return false;
+            }
+        }
+
         if (next === this.current) return false;
         this.current = next;
         return true;
