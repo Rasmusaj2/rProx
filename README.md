@@ -7,19 +7,20 @@ rProx watches who joins your games & lobbies, and looks up playerdata and stats
 ## Setup & Download
 Clone the reposity & install the required dependencies.
 ```bash
+git clone https://github.com/Rasmusaj2/rProx.git
+cd rProx
 npm install
-npm run dev  # or: npm run build && npm run serve
+npm start
 ```
-
 *Otherwise, a Windows binary is available [`here`](https://github.com/Rasmusaj2/rProx/releases)*
 
 After this rProx will be running on localhost:25565
 
-On first boot, rProx creates a config.json file. Stop the process, and modify the config to your liking.
+On first boot, rProx creates a config.json file. Close rProx, and edit the config file.
 
-It is recommended to set up your Hypixel API Key before proceeding and launching again.
+Here it is recommended to set your Hypixel, Urchin and Seraph API Keys.
 
-If you'd rather manually create this file before launch, [`example.config.json`](example.config.json) contains the same data, and will allow you to set it up before first launch
+After the config is edited, reopen rProx, connect to `127.0.0.1:25565` on Minecraft, and [`link`](https://microsoft.com/link) your Microsoft account.
 
 New settings are automatically filled into your config from new updates or plugins.
 
@@ -60,6 +61,8 @@ New settings are automatically filled into your config from new updates or plugi
 `//session [reset]` - Full breakdown of what you have fished in this session, per category and per hour
 
 `//bossbar [info|test [seconds]|off|mode <replace|adopt|own>|entity <dragon|wither>]` - Put a test boss bar up, print what the injector is holding, or change how it draws without a restart
+
+`//urchin [user]` - Check a users Urchin & Seraph tags
 
 ### Core Plugin Configuration
 
