@@ -186,9 +186,10 @@ Players can be looked up with `//urchin`
                 "apiKey": "", // seraph api key
                 "baseUrl": "https://api.seraph.si",
                 "scoreFactors": "",
-                "scoreThreshold": 0 // when to show a SNIPER tag based on seraphs sniperr score
+                "scoreThreshold": 0 // when to show a SNIPER tag based on seraphs sniper score
             }
-        }```
+        }
+```
 
 ### Extendable plugins
 rProx supports custom Plugins to add extended functionality and stat checking features.
