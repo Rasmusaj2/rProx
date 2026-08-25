@@ -28,6 +28,9 @@ const ladder = (run: McColorName[]) => (...limits: number[]): Thresholds =>
 export const ratioTiers = ladder(RATIO_RUN);
 export const countTiers = ladder(COUNT_RUN);
 
+// please note: i do not play a lot of these games, therefore a lot of the values are purely estimates
+// these values are easy to change, and should be changed if needed.
+
 // single mode
 export const BEDWARS_FKDR = ratioTiers(0.75, 1.5, 3, 7, 15, 35);
 export const SKYWARS_KDR = ratioTiers(0.75, 1.5, 3, 5, 8, 12);
@@ -165,3 +168,11 @@ export const PAINTBALL_KDR = ratioTiers(0.75, 1.5, 3, 5, 8, 12);
 
 // housing
 export const HOUSING_COOKIES = countTiers(10, 50, 250, 1000, 5000, 25000);
+
+// pit
+export const PIT_KILLS = countTiers(500, 2500, 10000, 30000, 75000, 200000);
+export const PIT_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
+
+// general
+export const HYPIXEL_LEVEL = countTiers(25, 100, 150, 200, 250, 300);
+export const ACHIEVEMENT_POINTS = countTiers(500, 2500, 5000, 10000, 15000, 20000);

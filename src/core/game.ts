@@ -77,10 +77,13 @@ export type GameMode = // this is kinda annoying to keep as a string union shoul
 // other
 | "housing" 
 | "lobby" // fishing primarily
-| "unknown";
+| "unknown"
+| "pit"
+| "general"; // for tags that are not game specific, like cheater flags
 
 // get from sidebar
 // REMEMBER: this matches first regex. keep simpler regexes later to avoid overlapping (ie. "hypixel" for the hypixel lobby, but that regex also gets triggered by hypixel says - same with (s)uhc)
+// NOTE: theres no regex for "general", ie. generalized hypixel stats.
 const TITLES: Array<[pattern: RegExp, game: GameMode]> = [
     [/BED\s*WARS/, "bedwars"],
     [/SKY\s*WARS/, "skywars"],
@@ -153,6 +156,7 @@ const TITLES: Array<[pattern: RegExp, game: GameMode]> = [
 
 
     [/HOUSING/, "housing"],
+    [/THE PIT/, "pit"],
     [/HYPIXEL/, "lobby"], // keep this at the bottom so it only matches if nothing else does. hypixel says matches otherwise but im not implementing it yet
 ];
 
@@ -167,7 +171,7 @@ export function gameFromTitle(title: string): GameMode {
 // lobbies and games we dont know fall back to bedwars, thats what most of this
 // is built around and its what used to show everywhere
 export function statsGame(game: GameMode): GameMode {
-    return game === "unknown" ? "bedwars" : game;
+    return game === "unknown" ? "general" : game;
 }
 
 // tags with no game on them are game agnostic (cheater flags and the like)

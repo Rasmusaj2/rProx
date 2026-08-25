@@ -771,6 +771,19 @@ const SPECS = {
         block: "Housing",
         head: { label: "Cookies", keys: ["cookies"], tiers: tiers.HOUSING_COOKIES, mark: "C" },
     },
+    pit: {
+        "title": "The Pit",
+        block: "The Pit",
+        head: wins(tiers.PIT_KILLS, "kills"),
+        trail: kdr(tiers.PIT_KDR),
+        lines: [count("Kills", "kills"), count("Deaths", "deaths"), count("Coins", "coins", true)],
+    },
+    general: {
+        title: "General",
+        block: "General",
+        head: { label: "Level", keys: ["level"], tiers: tiers.HYPIXEL_LEVEL, mark: "L" },
+        trail: {label: "Achievement Points", keys: ["achievement_points"], tiers: tiers.ACHIEVEMENT_POINTS, mark: "AP"},
+    }
 } satisfies Partial<Record<GameMode, GameSpec>>;
 
 // the games written by hand further up, the rest come out of SPECS
@@ -792,7 +805,7 @@ const BY_HAND = [
 
 type Handled =
     | "bedwars" | "skywars" | "duels" | "uhc" | "tntgames" | "murdermystery" | "lobby"
-    | "woolgames" | "woolwars" | "sheepwars" | "ctw" | "arcade" | "classic" 
+    | "woolgames" | "woolwars" | "sheepwars" | "ctw" | "arcade" | "classic" | "pit" | "general"
     | keyof typeof SPECS;
 
 // adding a game to GameMode without giving it tags turns this line red.
