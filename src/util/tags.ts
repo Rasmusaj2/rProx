@@ -411,7 +411,7 @@ const SPECS = {
         title: "Guess the Build",
         block: "BuildBattle",
         head: wins(tiers.GUESSTHEBUILD_WINS, "wins_guess_the_build"),
-        trail: { label: "Score", keys: ["score_guess_the_build"], tiers: tiers.GUESSTHEBUILD_SCORE, mark: "S", big: true },
+        trail: { label: "Guess", keys: ["correct_guesses"], tiers: tiers.GUESSTHEBUILD_GUESSES, mark: "G", big: true },
         lines: [count("Games", "games_played_guess_the_build"), count("Guesses", "correct_guesses_guess_the_build")],
     },
     cvc: {
