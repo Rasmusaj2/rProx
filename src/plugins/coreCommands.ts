@@ -1,7 +1,7 @@
 import { PREFIX } from "../core/chat";
 import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
-import type { Plugin } from "../core/types";
+import type { Plugin, PluginApi } from "../core/types";
 
 // built in commands. gets handed the enrichment engine and plugin registry
 // directly since its a first party plugin, not a drop-in one.
@@ -11,15 +11,22 @@ export function createCoreCommandsPlugin(
     prefix: string,
 ): Plugin {
     return {
-        name: "coreCommands",
+        name: "Core",
         version: "0.1.0",
-        description: "//help, //who, //sc and //plugins",
+        description: "Plugin containing core commands (//help, //who, //plugins, etc), and common helpful utilities",
 
         defaultConfig: {
             enabled: true,
+            blocked_messages: {
+                enabled: true,
+                patterns: [
+                    "Slow down! You can only use /tip every few seconds."
+                ]
+            }
         },
 
         setup(api) {
+            chatFilter(api);
             api.registerCommand(
                 "who",
                 (_args, session) => {
@@ -52,4 +59,20 @@ export function createCoreCommandsPlugin(
             );
         },
     };
+
+    function chatFilter(api: PluginApi): void {
+        const blockedMessages = api.pluginConfig.blocked_messages as
+            | { enabled?: boolean; patterns?: string[] }
+            | undefined;
+
+        for (const pattern of (blockedMessages?.patterns ?? [])) {
+            api.registerChatFilter((msg) => {
+                if (!blockedMessages?.enabled) return false;
+                if (msg.text.includes(pattern)) {
+                    api.log.debug(`CORE blocked message: ${msg.text}`);
+                    return true;
+                }
+            });
+        }
+    }
 }
