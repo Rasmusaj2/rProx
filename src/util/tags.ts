@@ -247,13 +247,16 @@ export const woolgamesTags = (player: HypixelPlayer): Tag[] => {
     if (Object.keys(progression).length === 0) return [];
     const star = woolStar(progression);
     const ww = inner(wool, "wool_wars", "stats");
-    const wins = stat(num(ww, "wins"), tiers.WOOL_WARS_WINS, { label: "W" });
+    const sheep = inner(wool, "sheep_wars", "stats");
+    const ctw = inner(wool, "capture_the_wool", "stats");
+    const wins = stat(num(ww , "wins") + num(sheep, "wins") + num(ctw, "participated_wins"), tiers.WOOL_WARS_WINS, { label: "W" });
     return gameTags(
         "woolgames",
         [
             `§7Wool Games ${star.formatted}`,
             `§7Wool Wars wins: ${wins.formatted}   §7Losses: ${w(num(ww, "losses"))}`,
-            `§7Sheep Wars wins: ${w(num(inner(wool, "sheep_wars", "stats"), "wins"))}   §7CTW wins: ${w(num(inner(wool, "capture_the_wool", "stats"), "participated_wins"))}`,
+            `§7Sheep Wars wins: ${w(num(sheep, "wins"))}`,
+            `§7CTW wins: ${w(num(ctw, "participated_wins"))}`,
             `§7Coins: ${w(compact(num(wool, "coins")))}`,
         ],
         star,
