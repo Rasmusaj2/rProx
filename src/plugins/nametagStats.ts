@@ -190,12 +190,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
 
         setup(api) {
             const config = api.pluginConfig as NametagConfig;
-            const ttl = (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000;
-            const doAboveHead = config.aboveHead !== false;
-            const doTablist = config.tablist !== false;
-            const maxTab = config.maxTablistPlayers ?? DEFAULT_MAX_TABLIST;
-            const version = api.config.proxy.version;
-            const concurrency = Math.max(1, config.lookupConcurrency ?? DEFAULT_CONCURRENCY);
+
             const sessions = new Map<string, SessionState>();
 
             const stateFor = (id: string): SessionState => {
@@ -214,7 +209,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         pending: new Set(),
                         dirty: new Set(),
                         games: new GameTracker(),
-                        schedule: limiter(concurrency),
+                        schedule: limiter(config.lookupConcurrency ?? DEFAULT_CONCURRENCY),
                     };
                     sessions.set(id, state);
                 }
@@ -332,7 +327,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
 
                 const entry: CacheEntry = { expires: Infinity, lookup: Promise.resolve({ tags: [], failed: true }) };
                 const settle = (result: Collected): Collected => {
-                    entry.expires = Date.now() + (result.failed ? FAILED_TTL_MS : ttl);
+                    entry.expires = Date.now() + (result.failed ? FAILED_TTL_MS : (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000);
                     if (result.failed) state.failures.set(key, (state.failures.get(key) ?? 0) + 1);
                     else state.failures.delete(key);
                     return result;
@@ -403,7 +398,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
 
                     if (action === "add_player") {
                         if (!entry.name) continue;
-                        const serverDisplay = entry.displayName ? componentToLegacy(version, entry.displayName) : undefined;
+                        const serverDisplay = entry.displayName ? componentToLegacy(api.config.proxy.version, entry.displayName) : undefined;
                         state.tab.set(uuid, { name: entry.name, serverDisplay });
                         state.tabByName.set(entry.name.toLowerCase(), uuid);
                         if (hasNpcRank(serverDisplay)) markNpc(session, state, entry.name);
@@ -427,7 +422,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     } else if (action === "update_display_name") {
                         const known = state.tab.get(uuid);
                         if (!known) continue;
-                        const incoming = entry.displayName ? componentToLegacy(version, entry.displayName) : undefined;
+                        const incoming = entry.displayName ? componentToLegacy(api.config.proxy.version, entry.displayName) : undefined;
                         if (incoming !== known.applied) { // ignore the echo of our own value
                             known.serverDisplay = incoming;
                             if (hasNpcRank(incoming)) markNpc(session, state, known.name);
@@ -437,7 +432,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 }
 
                 // someone leaving hands their slot back to the budget
-                if (freed && tracked(state) < maxTab) {
+                if (freed && tracked(state) < (config.maxTablistPlayers ?? DEFAULT_MAX_TABLIST)) {
                     for (const [id, entry] of state.tab) {
                         if (!entry.applied) queued.add(id);
                     }
@@ -478,11 +473,11 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 const hit = state.tagCache.get(key);
                 if (hit && hit.expires > Date.now()) return true; 
                 if (state.joined.has(key)) return true; // joined after us
-                return tracked(state) < maxTab;
+                return tracked(state) < (config.maxTablistPlayers ?? DEFAULT_MAX_TABLIST);
             }
 
             function queueTab(session: Session, state: SessionState, uuid: string): void {
-                if (!doTablist) return;
+                if (!config.tablist) return;
                 const entry = state.tab.get(uuid);
                 // skip invalid entries, npcs, and hypixels fake "Tokens: ..." style
                 // tab rows, none of which should cost a lookup
@@ -661,7 +656,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
             }
 
             function queueTeam(session: Session, state: SessionState, teamName: string): void {
-                if (!doAboveHead) return;
+                if (!config.aboveHead) return;
                 const team = state.teams.get(teamName);
                 if (!team?.complete) return;
                 if (hasNpcRank(team.serverPrefix) || hasNpcRank(team.serverSuffix)) return;
@@ -731,7 +726,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 });
             }
 
-            api.log.info(`name decoration active (above-head: ${doAboveHead}, tablist: ${doTablist})`);
+            api.log.info(`name decoration active (above-head: ${config.aboveHead}, tablist: ${config.tablist})`);
         },
     };
 }

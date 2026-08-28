@@ -151,28 +151,23 @@ export const lobbyFishingPlugin: Plugin = {
     },
     setup(api) {
         const config = api.pluginConfig as LobbyFishingConfig;
-        const useSidebar = config.sidebar !== false;
-        const maxLines = Math.max(1, Math.floor(config.maxSidebarLines ?? SIDEBAR_LINES));
-        const useSpacer = config.spacer !== false;
-        const sessions = new Map<string, SessionState>();
 
-        const mythicalConfig = config.mythical ?? {};
-        const trackFight = mythicalConfig.enabled !== false;
-        const useBossBar = mythicalConfig.bossBar !== false;
-        const barMode: BarMode = mythicalConfig.bar === "progress" ? "progress" : "heat";
-        const bossBarMode: BossBarMode = BAR_MODES.includes(mythicalConfig.bossBarMode as BossBarMode)
-            ? (mythicalConfig.bossBarMode as BossBarMode)
-            : mythicalConfig.adoptServerBar
+        const sessions = new Map<string, SessionState>();
+        
+        const barMode: BarMode = config.mythical?.bar === "progress" ? "progress" : "heat";
+        const bossBarMode: BossBarMode = BAR_MODES.includes(config.mythical?.bossBarMode as BossBarMode)
+            ? (config.mythical?.bossBarMode as BossBarMode)
+            : config.mythical?.adoptServerBar
               ? "adopt"
               : "replace";
-        const bossEntity: BossEntity = BOSS_ENTITIES.includes(mythicalConfig.bossEntity as BossEntity)
-            ? (mythicalConfig.bossEntity as BossEntity)
+        const bossEntity: BossEntity = BOSS_ENTITIES.includes(config.mythical?.bossEntity as BossEntity)
+            ? (config.mythical?.bossEntity as BossEntity)
             : "dragon";
         const heat: HeatModel = {
-            perClick: positive(mythicalConfig.heatPerClick, DEFAULT_HEAT.perClick),
-            decayPerSecond: positive(mythicalConfig.heatDecayPerSecond, DEFAULT_HEAT.decayPerSecond),
-            max: positive(mythicalConfig.heatMax, DEFAULT_HEAT.max),
-            safe: atLeastZero(mythicalConfig.safeHeat, DEFAULT_HEAT.safe),
+            perClick: positive(config.mythical?.heatPerClick, DEFAULT_HEAT.perClick),
+            decayPerSecond: positive(config.mythical?.heatDecayPerSecond, DEFAULT_HEAT.decayPerSecond),
+            max: positive(config.mythical?.heatMax, DEFAULT_HEAT.max),
+            safe: atLeastZero(config.mythical?.safeHeat, DEFAULT_HEAT.safe),
         };
         heat.safe = Math.min(heat.safe, heat.max);
 
@@ -202,7 +197,7 @@ export const lobbyFishingPlugin: Plugin = {
             let state = sessions.get(session.id);
             if (!state) {
                 const sidebar = new SidebarApi(session, {
-                    maxLines,
+                    maxLines: config.maxSidebarLines,
                     onError: (error) => api.log.debug(`sidebar update failed: ${error}`),
                 });
                 for (const pattern of hidden) sidebar.removeLines(pattern);
@@ -235,11 +230,11 @@ export const lobbyFishingPlugin: Plugin = {
                 rows = build(word);
             }
             // the blank sits above our block so hypixels rows dont run into ours.
-            return useSpacer ? [" ", ...rows] : rows;
+            return config.spacer !== false ? [" ", ...rows] : rows;
         }
 
         const showable = (state: SessionState): boolean =>
-            useSidebar &&
+            config.sidebar !== false &&
             totalCatches(state.totals) > 0 &&
             gameFromTitle(state.sidebar.serverTitle ?? "") === "lobby";
 
@@ -333,7 +328,7 @@ export const lobbyFishingPlugin: Plugin = {
                     pushBar(session, state);
                     return;
                 }
-                if (!useBossBar) return;
+                if (!config.mythical?.bossBar) return;
                 state.bossbar.set({ title: barTitle(fight), progress: barProgress(fight) });
                 pushBar(session, state);
                 // whether the bar we ended up on is one of hypixels or one of ours
@@ -353,7 +348,7 @@ export const lobbyFishingPlugin: Plugin = {
 
         // fight on entities since its not announced in chat
         api.on("serverPacket", (name, data, session) => {
-            if (!trackFight) return;
+            if (!config.mythical?.enabled) return;
             const state = stateFor(session);
             const now = Date.now();
             try {
@@ -429,7 +424,7 @@ export const lobbyFishingPlugin: Plugin = {
         });
 
         api.on("clientPacket", (name, data, session) => {
-            if (!trackFight) return;
+            if (!config.mythical?.enabled) return;
             const state = stateFor(session);
             try {
                 // a wither only draws a bar while it is in shot, so where the player
@@ -526,7 +521,7 @@ export const lobbyFishingPlugin: Plugin = {
         );
 
         // debug command for boss bar
-        if (mythicalConfig.debug) {
+        if (config.mythical?.debug) {
             api.registerCommand(
                 "bossbar",
                 (args, session) => {
@@ -583,10 +578,10 @@ export const lobbyFishingPlugin: Plugin = {
                 `test and tune the mythical boss bar, ${api.config.commandPrefix}bossbar info`,
             );
 
-            api.log.info(`lobby catch tracking active (sidebar: ${useSidebar}, ${maxLines} row cap)`);
-            if (trackFight) {
+            api.log.info(`lobby catch tracking active (sidebar: ${config.maxSidebarLines}, ${config.maxSidebarLines} row cap)`);
+            if (config.mythical?.enabled) {
                 api.log.info(
-                    `mythical fight tracking active (boss bar: ${useBossBar} ${bossBarMode}/${bossEntity}, fill: ${barMode}, heat ${heat.perClick}/click, -${heat.decayPerSecond}/s)`,
+                    `mythical fight tracking active (boss bar: ${config.mythical?.bossBar} ${config.mythical?.bossBarMode}/${config.mythical?.bossEntity}, fill: ${config.mythical?.bar}, heat ${config.mythical?.heatPerClick}/click, -${config.mythical?.heatDecayPerSecond}/s)`,
                 );
             }
         }

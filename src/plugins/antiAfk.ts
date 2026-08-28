@@ -55,8 +55,7 @@ export const antiAfkPlugin: Plugin = {
     setup(api) {
         const config = api.pluginConfig as AntiAfkConfig;
 
-        const charset = config.charset && config.charset.length > 0 ? config.charset : DEFAULT_CHARSET;
-        if (config.charset !== undefined && charset !== config.charset) {
+        if (config.charset !== undefined && config.charset !== config.charset) {
             api.log.warn("charset is empty, falling back to the default alphanumeric set");
         }
         const length = Math.max(1, Math.floor(config.messageLength ?? DEFAULT_LENGTH));
@@ -65,10 +64,6 @@ export const antiAfkPlugin: Plugin = {
         if (interval !== requested) {
             api.log.warn(`intervalSeconds ${requested} is too low, clamped to ${MIN_INTERVAL}s`);
         }
-        const hideMessages = config.hideMessages !== false;
-        const autoStart = config.autoStart !== false;
-        const lobbyOnly = config.lobbyOnly !== false;
-        const messagePrefix = config.prefix ?? DEFAULT_PREFIX;
 
         const sessions = new Map<string, AfkState>();
 
@@ -77,10 +72,10 @@ export const antiAfkPlugin: Plugin = {
             do {
                 token = "";
                 for (let i = 0; i < length; i++) {
-                    token += charset[Math.floor(Math.random() * charset.length)];
+                    token += (config.charset ?? DEFAULT_CHARSET)[Math.floor(Math.random() * (config.charset?.length ?? DEFAULT_CHARSET.length))];
                 }
                 // a single char charset can never differ, dont spin forever on it
-            } while (token === avoid && charset.length > 1);
+            } while (token === avoid && (config.charset?.length ?? DEFAULT_CHARSET.length) > 1);
             return token;
         };
 
@@ -88,11 +83,11 @@ export const antiAfkPlugin: Plugin = {
         const targetOf = (session: Session) => config.targetUser || session.username;
 
         const tick = (session: Session, tokens: string[]): void => {
-            if (lobbyOnly && !session.lobby) {
+            if (config.lobbyOnly && !session.lobby) {
                 api.log.debug(`skipping anti-afk dm for ${session.username}, in a game`);
                 return;
             }
-            const token = messagePrefix + randomToken(tokens[tokens.length - 1]);
+            const token = config.prefix ?? DEFAULT_PREFIX + randomToken(tokens[tokens.length - 1]);
             tokens.push(token);
             if (tokens.length > KEEP_TOKENS) tokens.shift();
             const target = targetOf(session);
@@ -118,11 +113,11 @@ export const antiAfkPlugin: Plugin = {
         };
 
         api.on("sessionStart", (session) => {
-            if (autoStart) start(session);
+            if (config.autoStart) start(session);
         });
         api.on("sessionEnd", (session) => stop(session.id));
 
-        if (hideMessages) {
+        if (config.hideMessages) {
             api.registerChatFilter((msg, session) => {
                 const state = sessions.get(session.id);
                 if (!state) return false;
@@ -151,7 +146,7 @@ export const antiAfkPlugin: Plugin = {
                     start(session);
                     session.chat.text(
                         `${PREFIX} §aAnti-AFK on §7- messaging §f${config.targetUser || "yourself"}§7 every §f${interval}s` +
-                            `§7${lobbyOnly ? " §8(lobbies only)" : ""}${hideMessages ? " §8(echo hidden)" : ""}`,
+                            `§7${config.lobbyOnly ? " §8(lobbies only)" : ""}${config.hideMessages ? " §8(echo hidden)" : ""}`,
                     );
                 } else {
                     stop(session.id);
@@ -162,7 +157,7 @@ export const antiAfkPlugin: Plugin = {
         );
 
         api.log.info(
-            `anti-afk ready (${interval}s, ${autoStart ? "auto-start" : "manual"}, ${lobbyOnly ? "lobbies only" : "everywhere"}, echo ${hideMessages ? "hidden" : "shown"})`,
+            `anti-afk ready (${interval}s, ${config.autoStart ? "auto-start" : "manual"}, ${config.lobbyOnly ? "lobbies only" : "everywhere"}, echo ${config.hideMessages ? "hidden" : "shown"})`,
         );
     },
 };

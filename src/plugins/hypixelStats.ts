@@ -141,7 +141,7 @@ export const hypixelStatsPlugin: Plugin = {
     setup(api) {
         const config = api.pluginConfig as HypixelStatsConfig;
         const ttl = (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000;
-        const hypixel = new HypixelService(api.http, config.apiKey ?? "", ttl);
+        const hypixel = new HypixelService(api.http, config.apiKey ?? "", ttl); // this is hard to convert to a hard reference unless the HypixelService takes in the entire config object
 
         if (!hypixel.enabled) {
             api.log.warn("no apiKey set, hypixelStats is off (set builtInPlugins.hypixelStats.apiKey)");

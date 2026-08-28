@@ -192,11 +192,7 @@ export const urchinPlugin: Plugin = {
         const config = api.pluginConfig as UrchinConfig;
         const seraphConfig = config.seraph ?? {};
 
-        const urchinKey = String(config.apiKey ?? "").trim();
-        const seraphKey = String(seraphConfig.apiKey ?? "").trim();
-        const seraphWanted = seraphConfig.enabled !== false;
-
-        if (!urchinKey && !(seraphWanted && seraphKey)) {
+        if (!config.apiKey && !(seraphConfig.enabled && seraphConfig.apiKey)) {
             api.log.warn(
                 "no api keys set, blacklist tags are off (builtInPlugins.urchin.apiKey and/or builtInPlugins.urchin.seraph.apiKey)",
             );
@@ -216,8 +212,9 @@ export const urchinPlugin: Plugin = {
         const commandPrefix = api.config.commandPrefix;
 
 
-        const urchin: SourceState = { name: "urchin", disabled: !urchinKey, cooldownUntil: 0 };
-        const seraph: SourceState = { name: "seraph", disabled: !(seraphWanted && seraphKey), cooldownUntil: 0 };
+
+        const urchin: SourceState = { name: "urchin", disabled: !config.apiKey, cooldownUntil: 0 };
+        const seraph: SourceState = { name: "seraph", disabled: !(seraphConfig.enabled && seraphConfig.apiKey), cooldownUntil: 0 };
         const anyLive = () => !urchin.disabled || !seraph.disabled;
 
         function checkFatal(source: SourceState, status: number): boolean {
@@ -335,7 +332,7 @@ export const urchinPlugin: Plugin = {
                     urchin,
                     "POST",
                     `${urchinBase}/v3/players`,
-                    { "x-api-key": urchinKey },
+                    { "x-api-key": config.apiKey ?? "" },
                     { uuids },
                 );
                 if (!result.ok) {
@@ -364,7 +361,7 @@ export const urchinPlugin: Plugin = {
                 urchin,
                 "GET",
                 `${urchinBase}/v3/player/tags?player=${encodeURIComponent(name)}`,
-                { "x-api-key": urchinKey },
+                { "x-api-key": config.apiKey ?? "" },
             );
             if (result.fatal) return [];
             if (result.status === 404) return []; 
@@ -391,7 +388,7 @@ export const urchinPlugin: Plugin = {
                 seraph,
                 "GET",
                 `${seraphBase}/${uuid}/cubelify/blacklist${query}`,
-                { "seraph-api-key": seraphKey },
+                { "seraph-api-key": seraphConfig.apiKey ?? "" },
             );
             if (result.fatal) return null;
             if (result.status === 400 || result.status === 404) return null; 

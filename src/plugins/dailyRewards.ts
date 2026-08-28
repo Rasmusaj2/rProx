@@ -48,13 +48,6 @@ export const dailyRewardsPlugin: Plugin = {
         if (config.mode && config.mode !== "auto" && config.mode !== "chat") {
             api.log.warn(`unknown mode "${config.mode}", falling back to "chat" (use "chat" or "auto")`);
         }
-        const mode = config.mode === "auto" ? "auto" : "chat";
-        const prefer = config.prefer ?? [];
-        const prefix = api.config.commandPrefix;
-        const request = {
-            userAgent: config.userAgent ?? DEFAULT_USER_AGENT,
-            timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-        };
 
         const handled = new Set<string>();
         const lastSeen = new Map<string, string>(); // session id to reward id
@@ -91,7 +84,7 @@ export const dailyRewardsPlugin: Plugin = {
         };
 
         const offer = (session: Session, rewards: RewardSession): void => {
-            const best = pickBest(rewards.rewards, prefer);
+            const best = pickBest(rewards.rewards, config.prefer);
             session.chat.raw(
                 component([
                     { text: `${PREFIX} §eDaily reward ready${streakText(rewards)}` },
@@ -108,7 +101,7 @@ export const dailyRewardsPlugin: Plugin = {
                             { text: reward.rarity ? ` ${reward.rarity}` : "" },
                             {
                                 text: index === best ? " §8[§aCLAIM §e★§8]" : " §8[§fCLAIM§8]",
-                                runCommand: `${prefix}reward claim ${index + 1}`,
+                                runCommand: `${api.config.commandPrefix}reward claim ${index + 1}`,
                                 tooltip: `§7Claim ${COLOR_CODES[rarityColor(reward.rarity)]}${label}§7`,
                             },
                         ]),
@@ -123,7 +116,10 @@ export const dailyRewardsPlugin: Plugin = {
                 session.chat.text(`${PREFIX} §7There is no option §f${option + 1}§7 on that reward.`);
                 return false;
             }
-            const result = await claimReward(rewards, option, request);
+            const result = await claimReward(rewards, option, {
+                userAgent: config.userAgent ?? DEFAULT_USER_AGENT,
+                timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+            });
             if (result.status === "claimed") {
                 remember(rewards.id);
                 api.log.info(`claimed reward ${rewards.id} option ${option + 1} (${rewardLabel(reward)})`);
@@ -141,7 +137,10 @@ export const dailyRewardsPlugin: Plugin = {
         };
 
         const load = async (session: Session, id: string): Promise<RewardSession | null> => {
-            const result = await fetchRewardSession(id, request);
+            const result = await fetchRewardSession(id, {
+                userAgent: config.userAgent ?? DEFAULT_USER_AGENT,
+                timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+            });
             if (result.status !== "ok") {
                 reportFailure(session, id, result);
                 return null;
@@ -161,11 +160,11 @@ export const dailyRewardsPlugin: Plugin = {
                     handled.delete(id);
                     return;
                 }
-                if (mode !== "auto") {
+                if (config.mode !== "auto") {
                     offer(session, rewards);
                     return;
                 }
-                if (!(await claim(session, rewards, pickBest(rewards.rewards, prefer)))) handled.delete(id);
+                if (!(await claim(session, rewards, pickBest(rewards.rewards, config.prefer)))) handled.delete(id);
             })();
         });
 
@@ -194,7 +193,7 @@ export const dailyRewardsPlugin: Plugin = {
                     // refetch, the cookie and token have to come from the same request
                     const rewards = await load(session, id);
                     if (!rewards) return;
-                    await claim(session, rewards, option ?? pickBest(rewards.rewards, prefer));
+                    await claim(session, rewards, option ?? pickBest(rewards.rewards, config.prefer));
                     return;
                 }
 
@@ -203,7 +202,7 @@ export const dailyRewardsPlugin: Plugin = {
                     session.chat.text(
                         first
                             ? `${PREFIX} §7That does not look like a reward link or id.`
-                            : `${PREFIX} §7No reward link seen yet this session. §8(${prefix}reward <link>)`,
+                            : `${PREFIX} §7No reward link seen yet this session. §8(${api.config.commandPrefix}reward <link>)`,
                     );
                     return;
                 }
@@ -211,10 +210,10 @@ export const dailyRewardsPlugin: Plugin = {
                 const rewards = await load(session, id);
                 if (rewards) offer(session, rewards);
             },
-            `show the current daily reward options, ${prefix}reward claim [1-3] to take one`,
+            `show the current daily reward options, ${api.config.commandPrefix}reward claim [1-3] to take one`,
         );
 
-        api.log.info(`daily rewards in ${mode} mode`);
+        api.log.info(`daily rewards in ${config.mode} mode`);
     },
 };
 
