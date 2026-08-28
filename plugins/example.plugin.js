@@ -12,7 +12,9 @@ module.exports = {
     },
 
     setup(api) {
-        const config = api.pluginConfig ?? this.defaultConfig;
+        const config = api.pluginConfig ?? this.defaultConfig; // Use a reference to the plugin here
+        // this lets you have a reference of the plugins config object, instead of a copy of the current value you'd have by doing
+        // const reply = api.pluginConfig.reply; // this would be a copy of the value, and if the config is changed, it would not be updated until the process restarted
         const bars = new Map(); // sidebars
 
         const sidebarFor = (session) => { // get or create a sidebar for this session
