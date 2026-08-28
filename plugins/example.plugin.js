@@ -12,7 +12,7 @@ module.exports = {
     },
 
     setup(api) {
-        const reply = api.pluginConfig.reply ?? "pong";
+        const config = api.pluginConfig ?? this.defaultConfig;
         const bars = new Map(); // sidebars
 
         const sidebarFor = (session) => { // get or create a sidebar for this session
@@ -27,7 +27,7 @@ module.exports = {
             return sidebar;
         };
 
-        api.registerCommand("ping", async (args, session) => { session.chat.text(reply) },
+        api.registerCommand("ping", async (args, session) => { session.chat.text(config.reply) },
             "Responds with 'pong' to test the plugin.");
 
         api.registerCommand("togglesidebar", async (args, session) => {
