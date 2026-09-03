@@ -3,6 +3,7 @@ import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
 import type { Plugin, PluginApi } from "../core/types";
 import { createConfigEditor, parsePath, resolvePath } from "./corePluginUtils/configEditor";
+import { registerNickbook } from "./corePluginUtils/nickbook";
 
 // built in commands. gets handed the enrichment engine and plugin registry
 // directly since its a first party plugin, not a drop-in one.
@@ -13,7 +14,7 @@ export function createCoreCommandsPlugin(
 ): Plugin {
     return {
         name: "Core",
-        version: "0.2.0",
+        version: "0.3.0",
         description: "Plugin containing core commands (//help, //who, //plugins, etc), and common helpful utilities",
 
         defaultConfig: {
@@ -26,15 +27,18 @@ export function createCoreCommandsPlugin(
             },
             nickbook: {
                 enabled: true,
-                UseLabe: "[USE NAME]",
-                RerollLabel: "[REROLL NAME]",
-                throttleTime: 400, // milliseconds to wait before allowing another reroll to allow hypixel "ratelimit" stuff and double rolling names
-                restoreHeldItem: true
+                restoreHeldItem: true,
+                rerollCooldownMs: 400, // hypixel anti "ratelimit" stuff
+                // button labels to match against
+                useLabels: ["USE NAME"],
+                rerollLabels: ["TRY AGAIN"],
+                trace: false, // log the packet info for debugging
             }
         },
 
         setup(api) {
             chatFilter(api);
+            registerNickbook(api);
             api.registerCommand(
                 "who",
                 (_args, session) => {
