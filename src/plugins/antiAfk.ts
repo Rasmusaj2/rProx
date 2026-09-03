@@ -55,7 +55,7 @@ export const antiAfkPlugin: Plugin = {
     setup(api) {
         const config = api.pluginConfig as AntiAfkConfig;
 
-        if (config.charset !== undefined && config.charset !== config.charset) {
+        if (!config.charset) {
             api.log.warn("charset is empty, falling back to the default alphanumeric set");
         }
         const length = Math.max(1, Math.floor(config.messageLength ?? DEFAULT_LENGTH));
@@ -87,7 +87,7 @@ export const antiAfkPlugin: Plugin = {
                 api.log.debug(`skipping anti-afk dm for ${session.username}, in a game`);
                 return;
             }
-            const token = config.prefix ?? DEFAULT_PREFIX + randomToken(tokens[tokens.length - 1]);
+            const token = (config.prefix ?? DEFAULT_PREFIX) + randomToken(tokens[tokens.length - 1]);
             tokens.push(token);
             if (tokens.length > KEEP_TOKENS) tokens.shift();
             const target = targetOf(session);
