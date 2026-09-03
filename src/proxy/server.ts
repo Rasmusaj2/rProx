@@ -8,6 +8,7 @@ import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
 import { LobbyTracker, parseWhoResponse, type PlayerInfoPacket } from "../core/lobby";
 import { makeChatInjector, parseChat, PREFIX } from "../core/chat";
+import { createWindowApi } from "../interface/windowApi";
 import type { ChatMessage, Session } from "../core/types";
 
 const log = createLogger("proxy");
@@ -154,18 +155,33 @@ export class ProxyServer {
         });
 
         const lobby = new LobbyTracker();
+        const toClient = (name: string, data: unknown) => {
+            if (client.state === states.PLAY) client.write(name, data);
+        };
+        const toServer = (name: string, data: unknown) => {
+            if (target.state === states.PLAY) target.write(name, data);
+        };
+        // chest guis of our own live here. it needs to send both ways - windows of
+        // ours go to the client, and pressing a button in one of hypixels goes up
+        const windows = createWindowApi(
+            { sendPacket: toClient, sendServerPacket: toServer },
+            {
+                version: this.config.proxy.version,
+                onError: (error) => clog.debug(`window api: ${error}`),
+            },
+        );
         const session: Session = { // player sessions
             id,
             username: client.username,
             chat: makeChatInjector(client),
             game: "unknown", // nametagStats fills this in off the scoreboard and we dont have a scoreboard yet - also irrelevant anyways if nametagStats is off
             lobby: true,
+            windows,
             sendUpstream: (message: string) => {
                 if (target.state === states.PLAY) target.write("chat", { message });
             },
-            sendPacket: (name: string, data: unknown) => {
-                if (client.state === states.PLAY) client.write(name, data);
-            },
+            sendPacket: toClient,
+            sendServerPacket: toServer,
             players: () => lobby.list(),
             findPlayer: (name: string) => lobby.get(name),
             isNpc: (name: string) => lobby.isNpc(name),
@@ -178,6 +194,7 @@ export class ProxyServer {
             ended = true;
             clog.info(`session ended (${who})${reason ? `: ${reason}` : ""}`);
             this.lastGameStart.delete(session.id);
+            windows.dispose();
             try {
                 client.end("Proxy connection closed");
             } catch {
@@ -205,6 +222,9 @@ export class ProxyServer {
                 else if (meta.name === "player_info") lobby.applyPlayerInfo(data as PlayerInfoPacket);
                 // forced to clear lobby on login because hypixel sends a player_info packet 
                 else if (meta.name === "login") lobby.clear();
+                // windows before the event, so a plugin reading session.windows in
+                // a serverPacket handler is looking at the current state
+                windows.handleServerPacket(meta.name, data);
                 this.bus.emit("serverPacket", meta.name, data, session);
             } catch (error) {
                 clog.debug(`parse error: ${error}`);
@@ -227,7 +247,14 @@ export class ProxyServer {
                 void this.onCommand(data.message, session, clog);
                 return; // handled here, dont forward it
             }
+            // a click in a window of ours is talking about a window id hypixel has
+            // never heard of, so it can never be forwarded. a plugin filter can
+            // swallow anything else it asked for. both still get the event, same as
+            // a hidden chat line does
+            const inWindow = windows.handleClientPacket(meta.name, data);
+            const filtered = this.plugins.blocksClient(meta.name, data, session);
             this.bus.emit("clientPacket", meta.name, data, session);
+            if (inWindow || filtered) return;
             target.write(meta.name, data);
         });
         client.on("error", (error: unknown) => cleanup("client error", (error as Error)?.message));

@@ -1,5 +1,6 @@
 import Module from "node:module";
 import * as sidebar from "../interface/sidebarApi";
+import * as windows from "../interface/windowApi";
 import * as colors from "../util/mcColors";
 
 // let external plugins import the same instance of the apis available to the proxy itself, so they can use the same types and functions
@@ -7,6 +8,7 @@ import * as colors from "../util/mcColors";
 // this is a bit hacky but it works, and is the only way to get a plugin to use the same instance of the apis as the proxy itself, so they can share state and types
 const api = {
     ...sidebar,
+    ...windows,
     colors,
 };
 
@@ -18,9 +20,11 @@ export type RProxPluginHost = typeof api;
 const registry = new Map<string, unknown>([
     ["rprox", api],
     ["rprox/sidebar", sidebar],
+    ["rprox/window", windows],
     ["rprox/colors", colors],
     // what a plugin written against the checked out repo would have asked for
     ["interface/sidebarApi", sidebar],
+    ["interface/windowApi", windows],
     ["util/mcColors", colors],
 ]);
 

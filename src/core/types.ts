@@ -3,6 +3,7 @@ import type { HttpClient } from "../util/http";
 import type { McColorName } from "../util/mcColors";
 import type { Config } from "../config";
 import type { GameMode } from "./game";
+import type { WindowApi } from "../interface/windowApi";
 
 export interface PlayerRef {
     name: string;
@@ -54,8 +55,10 @@ export interface Session {
     readonly chat: ChatInjector;
     game: GameMode; // active game, detected and kept up to date by nametagStats
     lobby: boolean;
+    readonly windows: WindowApi; // chest rewrites
     sendUpstream(message: string): void; // send a message/command as if typed
     sendPacket(name: string, data: unknown): void; // write a decoded packet to the client
+    sendServerPacket(name: string, data: unknown): void; // write a decoded packet to hypixel, as if the client sent it
     players(): PlayerRef[]; // current tab list, npcs left out
     findPlayer(name: string): PlayerRef | undefined;
     isNpc(name: string): boolean; // a lobby npc, never worth a lookup
@@ -74,6 +77,9 @@ export type CommandHandler = (args: string[], session: Session) => void | Promis
 // return true to stop a line from ever reaching the client. runs before the
 // chat event, so other plugins still see what got hidden
 export type ChatFilter = (msg: ChatMessage, session: Session) => boolean | void;
+
+// return true to stop a client packet from reaching hypixel
+export type ClientFilter = (name: string, data: any, session: Session) => boolean | void;
 
 export interface ProxyEvents {
     sessionStart: (session: Session) => void;
@@ -94,6 +100,7 @@ export interface PluginApi {
     registerEnricher(enricher: Enricher): void;
     registerCommand(name: string, handler: CommandHandler, help?: string): void;
     registerChatFilter(filter: ChatFilter): void;
+    registerClientFilter(filter: ClientFilter): void;
 }
 
 export interface Plugin {

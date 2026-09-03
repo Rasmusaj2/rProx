@@ -8,11 +8,16 @@
 
 declare module "rprox" {
     export * from "../src/interface/sidebarApi";
+    export * from "../src/interface/windowApi";
     export * as colors from "../src/util/mcColors";
 }
 
 declare module "rprox/sidebar" {
     export * from "../src/interface/sidebarApi";
+}
+
+declare module "rprox/window" {
+    export * from "../src/interface/windowApi";
 }
 
 declare module "rprox/colors" {

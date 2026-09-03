@@ -9,7 +9,7 @@ import { applyPluginDefaults, saveConfig, type Config } from "../config";
 import { installHostModules } from "./pluginHost";
 import type { EventBus } from "./events";
 import type { EnrichmentEngine } from "./enrichment";
-import type { ChatFilter, ChatMessage, CommandHandler, Plugin, PluginApi, Session } from "./types";
+import type { ChatFilter, ChatMessage, ClientFilter, CommandHandler, Plugin, PluginApi, Session } from "./types";
 
 const log = createLogger("plugins");
 
@@ -26,6 +26,7 @@ interface RegisteredCommand {
 export class PluginManager {
     private commands = new Map<string, RegisteredCommand>();
     private chatFilters: Array<{ filter: ChatFilter; plugin: string }> = []; // allow plugins to add chat filters so they can hide messages from the client for data collection (ie. running /who and needing to hide it or dms from antiafk)
+    private clientFilters: Array<{ filter: ClientFilter; plugin: string }> = []; // allows blocking client packets from being sent to the server
     private loaded: string[] = [];
     private freshDefaults: string[] = []; // plugins whose defaults are not in config.json yet
 
@@ -67,6 +68,7 @@ export class PluginManager {
                 this.commands.set(key, { handler, help, plugin: plugin.name });
             },
             registerChatFilter: (filter) => this.chatFilters.push({ filter, plugin: plugin.name }),
+            registerClientFilter: (filter) => this.clientFilters.push({ filter, plugin: plugin.name }),
         };
     }
 
@@ -82,6 +84,21 @@ export class PluginManager {
             }
         }
         return hide;
+    }
+
+    // does any plugin want this client packet kept away from hypixel
+    blocksClient(name: string, data: unknown, session: Session): boolean {
+        if (this.clientFilters.length === 0) return false;
+        let block = false;
+        for (const { filter, plugin } of this.clientFilters) {
+            try {
+                // keep going after a hit so every filter still sees the packet
+                if (filter(name, data, session) === true) block = true;
+            } catch (error) {
+                log.error(`client filter from "${plugin}" threw: ${error}`);
+            }
+        }
+        return block;
     }
 
     // a plugin is on unless its config block says enabled: false.
