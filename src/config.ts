@@ -13,6 +13,7 @@ export interface Config {
         version: string, // 1.8.9
         motd: string, // Proxy | Aesthetic
         onlineMode: boolean, // true recommended - if false should only be run locally
+        allowIngameEditing: boolean, // true - allows editing config.json in a chest gui while in-game
         maxPlayers: number // 10
     },
     auth: {
@@ -37,6 +38,7 @@ const DEFAULTS: Config = {
         version: "1.8.9",
         motd: "§brProx §2| §6Hypixel Stats Proxy.",
         onlineMode: true,
+        allowIngameEditing: true,
         maxPlayers: 10
     },
     auth: {

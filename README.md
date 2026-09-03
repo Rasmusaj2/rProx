@@ -17,6 +17,7 @@ npm start
 After this rProx will be running on localhost:25565
 
 On first boot, rProx creates a config.json file. Close rProx, and edit the config file.
+> **Note:** Using //config, it is also possible to modify some configuration settings ingame.
 
 Here it is recommended to set your Hypixel, Urchin and Seraph API Keys.
 
@@ -64,6 +65,9 @@ New settings are automatically filled into your config from new updates or plugi
 
 `//urchin [user]` - Check a users Urchin & Seraph tags
 
+`//config` - Open `config.json` as a chest gui and allows you to edit it ingame.
+> **Note:** Some config items are not editable while the process is running, and will require a restart.
+
 ### Core Plugin Configuration
 
 rProx comes with 7 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing & a daily reward handler
@@ -76,7 +80,7 @@ The built in plugins include:
 
 Allows usage of //bw, //sw, //uhc, etc.
 ```json
-{
+"hypixelStats": {
     "enabled": true, 
     "apiKey": "", // Hypixel API Key
     "cacheTtlSeconds": 300
