@@ -13,7 +13,7 @@ export function createCoreCommandsPlugin(
 ): Plugin {
     return {
         name: "Core",
-        version: "0.1.0",
+        version: "0.2.0",
         description: "Plugin containing core commands (//help, //who, //plugins, etc), and common helpful utilities",
 
         defaultConfig: {
@@ -23,6 +23,13 @@ export function createCoreCommandsPlugin(
                 patterns: [
                     "Slow down! You can only use /tip every few seconds."
                 ]
+            },
+            nickbook: {
+                enabled: true,
+                UseLabe: "[USE NAME]",
+                RerollLabel: "[REROLL NAME]",
+                throttleTime: 400, // milliseconds to wait before allowing another reroll to allow hypixel "ratelimit" stuff and double rolling names
+                restoreHeldItem: true
             }
         },
 

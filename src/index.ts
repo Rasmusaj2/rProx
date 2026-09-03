@@ -8,7 +8,7 @@ import { PluginManager } from "./core/pluginManager";
 import { ProxyServer } from "./proxy/server";
 import { PREFIX } from "./core/chat";
 
-import { createCoreCommandsPlugin } from "./plugins/coreCommands";
+import { createCoreCommandsPlugin } from "./plugins/core";
 import { hypixelStatsPlugin } from "./plugins/hypixelStats";
 import { createNametagStatsPlugin } from "./plugins/nametagStats";
 import { dailyRewardsPlugin } from "./plugins/dailyRewards";
