@@ -43,7 +43,7 @@ import {
 } from "../services/thresholds";
 
 import { formatRankedName } from "../services/rank";
-import { resolveUuid } from "../services/microsoft";
+import { resolveUuid, dashUuid } from "../services/microsoft";
 import { COLOR_CODES, type McColorName } from "../util/mcColors";
 
 import * as tags from "../util/tags";
@@ -275,6 +275,14 @@ export const hypixelStatsPlugin: Plugin = {
             return { title: formatRankedName(result.player, target.name), player: result.player };
         };
 
+        // gexp + recent games, two extra endpoints the enricher never touches
+        const generalExtras = async (player: HypixelPlayer) => {
+            const dashed = player.uuid ? dashUuid(player.uuid) : undefined;
+            if (!dashed) return undefined;
+            const [gexp, recent] = await Promise.all([hypixel.guildExp(dashed), hypixel.recentGames(dashed)]);
+            return { gexp, recent };
+        };
+
         api.registerCommand(
             "duels",
             async (args, session) => {
@@ -387,7 +395,11 @@ export const hypixelStatsPlugin: Plugin = {
                 async (args, session) => {
                     const found = await resolve(args, session);
                     if (!found) return;
-                    const tag = tags.allTags(found.player).find((t) => t.game === game);
+                    // general is the one tooltip with extra endpoints behind it
+                    const extras = game === "general" ? await generalExtras(found.player) : undefined;
+                    const tag = game === "general"
+                        ? tags.generalTags(found.player, extras)[0]
+                        : tags.allTags(found.player).find((t) => t.game === game);
                     if (!tag?.tooltip) {
                         session.chat.text(`${PREFIX} ${found.title} §7- §b${game}`);
                         session.chat.text(`  §7No ${game} stats`);

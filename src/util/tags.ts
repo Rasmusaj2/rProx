@@ -18,8 +18,11 @@ import {
     tntGamesStats,
     murderMysteryStats,
     fishingStats,
+    networkLevel,
     ratio,
+    timeAgo,
     type HypixelPlayer,
+    type RecentGame,
 } from "../services/hypixel";
 import { allWins, block, compact, inner, num, ownStat, stat, total, type Raw, type Stat } from "../services/games";
 import { bedwarsStar, woolStar } from "../services/prestige";
@@ -353,6 +356,55 @@ export const classicTags = (player: HypixelPlayer): Tag[] => {
         ],
         head,
     );
+};
+
+
+// the two things //hypixel adds on top of the player object, both cost an
+// extra api call so the enricher never asks for them
+export interface GeneralExtras {
+    gexp?: number | null, // guild experience over the past week
+    recent?: RecentGame[] | null,
+}
+
+const gameTypeName = (raw: string): string =>
+    raw
+        .toLowerCase()
+        .split("_")
+        .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+        .join(" ");
+
+// network wide stats
+export const generalTags = (player: HypixelPlayer, extras: GeneralExtras = {}): Tag[] => {
+    const level = networkLevel(player.networkExp ?? 0);
+    const gifts = player.giftingMeta ?? {};
+    const quests = Object.values(player.quests ?? {}).reduce((sum, quest) => sum + (quest?.completions?.length ?? 0), 0);
+    const levelStat = stat(level, tiers.HYPIXEL_LEVEL, { label: "L" });
+    const pointsStat = stat(player.achievementPoints ?? 0, tiers.ACHIEVEMENT_POINTS, { label: "AP" });
+    const firstJoin = player.firstLogin
+        ? new Date(player.firstLogin).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+        : undefined;
+    const lines: Array<string | undefined> = [
+        `§7Network ${levelStat.formatted}`,
+        // last login only turns up when the api allows it, first join always shows
+        firstJoin
+            ? `§7First join: ${w(firstJoin)}${player.lastLogin ? `   §7Last login: §8${timeAgo(player.lastLogin)} ago` : ""}`
+            : undefined,
+        player.rewardStreak || player.rewardHighScore
+            ? `§7Reward streak: ${w(player.rewardStreak ?? 0)}   §7Best: ${w(player.rewardHighScore ?? 0)}   §7Karma: ${w(compact(player.karma ?? 0))}`
+            : `§7Karma: ${w(compact(player.karma ?? 0))}`,
+        `§7Ranks gifted: ${w(gifts.ranksGiven ?? 0)}   §7Quests: ${w(compact(quests))}`,
+        `§7Achievement points: ${pointsStat.formatted}   §7Achievements: ${w(Object.keys(player.achievements ?? {}).length)}`,
+        ...(extras.gexp ? [`§7Guild exp (week): ${w(compact(extras.gexp))}`] : []),
+        ...(extras.recent?.length
+            ? [
+                `§8Recent games:`,
+                ...extras.recent.slice(0, 5).map((game) =>
+                    `§8${timeAgo(game.ended ?? game.date ?? Date.now())} ago §7${gameTypeName(game.gameType ?? "")}` +
+                    (game.mode ? ` §8(${game.mode.toLowerCase().replace(/_/g, " ")})` : "")),
+            ]
+            : []),
+    ];
+    return gameTags("general", lines.filter((line): line is string => line !== undefined), levelStat, pointsStat);
 };
 
 
@@ -903,12 +955,6 @@ const SPECS = {
         trail: kdr(tiers.PIT_KDR),
         lines: [count("Kills", "kills"), count("Deaths", "deaths"), count("Coins", "coins", true)],
     },
-    general: {
-        title: "General",
-        block: "General",
-        head: { label: "Level", keys: ["level"], tiers: tiers.HYPIXEL_LEVEL, mark: "L" },
-        trail: {label: "Achievement Points", keys: ["achievement_points"], tiers: tiers.ACHIEVEMENT_POINTS, mark: "AP"},
-    }
 } satisfies Partial<Record<GameMode, GameSpec>>;
 
 // the games written by hand further up, the rest come out of SPECS
@@ -926,6 +972,7 @@ const BY_HAND = [
     ctwTags,
     arcadeTags,
     classicTags,
+    generalTags,
 ];
 
 type Handled =

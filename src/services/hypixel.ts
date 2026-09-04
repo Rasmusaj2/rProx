@@ -8,7 +8,21 @@ export interface HypixelPlayer {
     [key: string]: unknown;
     displayname?: string;
     uuid?: string;
-    achievements?: Record<string, number>;
+    networkExp?: number; // total network experience, the level has to be worked out from it
+    karma?: number;
+    achievementPoints?: number;
+    achievements?: Record<string, number>; // one key per unlocked achievement
+    firstLogin?: number;
+    lastLogin?: number;
+    rewardStreak?: number;
+    rewardHighScore?: number;
+    giftingMeta?: {
+        ranksGiven?: number, // the rank gifting counter the leaderboards use
+        giftsGiven?: number, // the older gift box system, not rank gifting
+        bundlesGiven?: number,
+        bundlesReceived?: number,
+    };
+    quests?: Record<string, { completions?: unknown[] } | undefined>;
     stats: {
         [game: string]: Record<string, any> | undefined;
         Bedwars?: Record<string, any>;
@@ -19,6 +33,29 @@ export interface HypixelPlayer {
         MurderMystery?: Record<string, any>;
         MainLobby?: Record<string, any>; // fishing lives in here, there is no stats.Fishing
     }
+}
+
+export interface GuildMember {
+    uuid?: string,
+    expHistory?: Record<string, { exp?: number } | undefined>,
+}
+
+export interface GuildResponse {
+    success?: boolean,
+    guild?: { members?: GuildMember[] } | null,
+}
+
+export interface RecentGame {
+    date?: number,
+    ended?: number,
+    gameType?: string,
+    mode?: string,
+    map?: string,
+}
+
+export interface RecentGamesResponse {
+    success?: boolean,
+    games?: RecentGame[],
 }
 
 interface HypixelResponse {
@@ -41,6 +78,9 @@ const ESSENTIAL_RESERVE = 20; // ratelimit to leave
 const BLIND_BACKOFF_MS = 60_000;
 const TRANSIENT_TTL_MS = 10_000;
 const BAD_KEY_TTL_MS = 300_000;
+const EXTRAS_TTL_MS = 60_000;
+
+const dashless = (uuid: string): string => uuid.replace(/-/g, "").toLowerCase();
 
 export class HypixelService {
     private cache = new Map<string, { expires: number; result: PlayerFetch }>();
@@ -49,6 +89,7 @@ export class HypixelService {
     private limitedUntil = 0; // nothing goes out before this
     private windowResetAt = 0; // when the quota rolls over, per RateLimit-Reset
     private remaining = Infinity; // what the last response said was left
+    private extras = new Map<string, { expires: number; value: unknown }>();
 
 
     constructor(private http: HttpClient, private readonly apiKey: string, private readonly ttl = 300_000) {}
@@ -71,6 +112,49 @@ export class HypixelService {
         const request = this.request(dashed, cacheKey).finally(() => this.inflight.delete(cacheKey));
         this.inflight.set(cacheKey, request);
         return request;
+    }
+
+    // guild stuff
+    async guildExp(dashedUuid: string): Promise<number | null> {
+        return this.cached(`guild:${dashedUuid}`, async () => {
+            const data = await this.get<GuildResponse>(`/v2/guild?player=${dashedUuid}`);
+            const stripped = dashless(dashedUuid);
+            const member = data?.guild?.members?.find((m) => dashless(m.uuid ?? "") === stripped);
+            if (!member?.expHistory) return null;
+            return Object.values(member.expHistory).reduce((sum, day) => sum + (day?.exp ?? 0), 0);
+        });
+    }
+
+    async recentGames(dashedUuid: string): Promise<RecentGame[] | null> {
+        return this.cached(`recent:${dashedUuid}`, async () => {
+            const data = await this.get<RecentGamesResponse>(`/v2/recentgames?uuid=${dashedUuid}`);
+            if (!data || data.success === false) return null;
+            return data.games ?? [];
+        });
+    }
+
+    private async get<T>(path: string): Promise<T | null> {
+        if (Date.now() < this.limitedUntil) return null;
+        try {
+            const res = await this.http.send<T>(
+                `https://api.hypixel.net${path}`,
+                "GET",
+                { headers: { "API-Key": this.apiKey }, timeout: 5000 }
+            );
+            this.readLimits(res.headers, res.status);
+            return res.status === 429 || !res.ok || !res.data ? null : res.data;
+        } catch {
+            return null;
+        }
+    }
+
+    private cached<T>(key: string, fetch: () => Promise<T | null>): Promise<T | null> {
+        const hit = this.extras.get(key);
+        if (hit && hit.expires > Date.now()) return Promise.resolve(hit.value as T | null);
+        return fetch().then((value) => {
+            this.extras.set(key, { expires: Date.now() + EXTRAS_TTL_MS, value });
+            return value;
+        });
     }
 
     private throttled(essential = false): boolean {
@@ -147,6 +231,19 @@ export function fetchErrorMessage(status: PlayerFetch["status"]): string {
 // safe fkdr calc
 export function ratio(a: number, b: number): number {
     return b === 0 ? a : Number((a / b).toFixed(2));
+}
+
+// network level conversion
+const NETWORK_LEVEL_START = 10000;
+const NETWORK_LEVEL_GROWTH = 2500;
+const NETWORK_LEVEL_OFFSET = -(NETWORK_LEVEL_START - 0.5 * NETWORK_LEVEL_GROWTH) / NETWORK_LEVEL_GROWTH;
+const NETWORK_LEVEL_CONST = NETWORK_LEVEL_OFFSET * NETWORK_LEVEL_OFFSET;
+
+export function networkLevel(networkExp: number): number {
+    if (!(networkExp > 0)) return 1;
+    return Math.floor(
+        1 + NETWORK_LEVEL_OFFSET + Math.sqrt(NETWORK_LEVEL_CONST + (2 / NETWORK_LEVEL_GROWTH) * networkExp),
+    );
 }
 
 // bedwars stats
@@ -657,6 +754,22 @@ export function duration(ms: number): string {
     const minutes = Math.floor(total / 60);
     const seconds = total % 60;
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+export function timeAgo(ms: number, now = Date.now()): string {
+    const seconds = Math.max(0, Math.floor((now - ms) / 1000));
+    const spans: Array<[span: number, label: string]> = [
+        [31_536_000, "y"], // seconds to time
+        [2_592_000, "mo"],
+        [604_800, "w"],
+        [86_400, "d"],
+        [3_600, "h"],
+        [60, "m"],
+    ];
+    for (const [span, label] of spans) {
+        if (seconds >= span) return `${Math.floor(seconds / span)}${label}`;
+    }
+    return `${seconds}s`;
 }
 
 function duelsMode(duels: Record<string, any>, mode: DuelsMode): DuelsModeStats {
