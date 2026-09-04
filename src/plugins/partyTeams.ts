@@ -189,12 +189,20 @@ export const partyTeamsPlugin: Plugin = {
                 api.log.debug(`partyTeams found no game teams, skipping announce. teams: ${dump}`);
                 return;
             }
+            const membersOf = (players: Set<string>): string[] =>
+                [...players].filter((member) => /^[A-Za-z0-9_]{1,16}$/.test(member) && !session.isNpc(member));
+            const allMembers = [...new Set([...teams.values()].flatMap((players) => membersOf(players)))];
+            const statsByMember = new Map<string, Awaited<ReturnType<typeof memberStats>>>();
+            await Promise.all(
+                allMembers.map(async (member) => {
+                    statsByMember.set(member, await memberStats(session, state, member));
+                }),
+            );
+
             for (const [letter, players] of teams) {
                 const team = TEAM_LETTERS[letter];
-                const members = [...players].filter(
-                    (member) => /^[A-Za-z0-9_]{1,16}$/.test(member) && !session.isNpc(member),
-                );
-                const stats = await Promise.all(members.map((member) => memberStats(session, state, member)));
+                const members = membersOf(players);
+                const stats = members.map((member) => statsByMember.get(member));
                 const got = stats.filter((s): s is { level: number; fkdr: number } => s !== undefined && !("nick" in s));
                 const nicks = stats.filter((s) => s !== undefined && "nick" in s).length;
                 if (got.length === 0 && nicks === 0) {
