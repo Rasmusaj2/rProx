@@ -150,6 +150,30 @@ export function ratio(a: number, b: number): number {
 }
 
 // bedwars stats
+// the four core queues, prefix of every per mode key (ie. eight_one_wins_bedwars)
+const BEDWARS_MODES: ReadonlyArray<readonly [prefix: string, name: string]> = [
+    ["eight_one", "Solo"],
+    ["eight_two", "Doubles"],
+    ["four_three", "3v3v3v3"],
+    ["four_four", "4v4"],
+];
+
+export interface BedwarsModeStats {
+    name: string,
+    finalKills: number,
+    finalDeaths: number,
+    fkdr: number,
+    wins: number,
+    losses: number,
+    wlr: number,
+    kills: number,
+    deaths: number,
+    kdr: number,
+    bblr: number,
+    bedsBroken: number,
+    bedsLost: number,
+}
+
 export interface BedwarsStats {
     level: number,
     finalKills: number,
@@ -161,28 +185,75 @@ export interface BedwarsStats {
     kills: number,
     deaths: number,
     kdr: number,
+    bblr: number,
+    bedsBroken: number,
+    bedsLost: number,
+    gamesPlayed: number,
     winstreak: number,
+    modes: BedwarsModeStats[],
 }
 
 export function bedwarsStats(player: HypixelPlayer): BedwarsStats {
     const bw = player.stats?.Bedwars ?? {};
-    
+    const n = (key: string): number => (typeof bw[key] === "number" && Number.isFinite(bw[key]) ? bw[key] : 0);
+    const mode = (prefix: string, name: string): BedwarsModeStats => {
+        const m = (key: string) => n(`${prefix}_${key}_bedwars`);
+        return {
+            name,
+            finalKills: m("final_kills"),
+            finalDeaths: m("final_deaths"),
+            fkdr: ratio(m("final_kills"), m("final_deaths")),
+            wins: m("wins"),
+            losses: m("losses"),
+            wlr: ratio(m("wins"), m("losses")),
+            kills: m("kills"),
+            deaths: m("deaths"),
+            kdr: ratio(m("kills"), m("deaths")),
+            bblr: ratio(m("beds_broken"), m("beds_lost")),
+            bedsBroken: m("beds_broken"),
+            bedsLost: m("beds_lost"),
+        };
+    };
+
     return {
         level: (player.achievements?.bedwars_level ?? 1), // bedwars stars in ap is +1 for some reason (apparently not it was just tweaking?)
-        finalKills: bw.final_kills_bedwars ?? 0,
-        finalDeaths: bw.final_deaths_bedwars ?? 0,
-        fkdr: ratio(bw.final_kills_bedwars ?? 0, bw.final_deaths_bedwars ?? 0),
-        wins: bw.wins_bedwars ?? 0,
-        losses: bw.losses_bedwars ?? 0,
-        wlr: ratio(bw.wins_bedwars ?? 0, bw.losses_bedwars ?? 0),
-        kills: bw.kills_bedwars ?? 0,
-        deaths: bw.deaths_bedwars ?? 0,
-        kdr: ratio(bw.kills_bedwars ?? 0, bw.deaths_bedwars ?? 0),
-        winstreak: bw.winstreak ?? 0,
+        finalKills: n("final_kills_bedwars"),
+        finalDeaths: n("final_deaths_bedwars"),
+        fkdr: ratio(n("final_kills_bedwars"), n("final_deaths_bedwars")),
+        wins: n("wins_bedwars"),
+        losses: n("losses_bedwars"),
+        wlr: ratio(n("wins_bedwars"), n("losses_bedwars")),
+        kills: n("kills_bedwars"),
+        deaths: n("deaths_bedwars"),
+        kdr: ratio(n("kills_bedwars"), n("deaths_bedwars")),
+        bblr: ratio(n("beds_broken_bedwars"), n("beds_lost_bedwars")),
+        bedsBroken: n("beds_broken_bedwars"),
+        bedsLost: n("beds_lost_bedwars"),
+        gamesPlayed: n("games_played_bedwars"),
+        winstreak: n("winstreak"),
+        modes: BEDWARS_MODES.map(([prefix, name]) => mode(prefix, name)),
     }
 }
 
 // skywars stats
+// solo/teams/mega, suffix of every per mode key (ie. kills_solo). lab and
+// ranked left out, lab is retired and ranked barely anyone has data for
+const SKYWARS_MODES: ReadonlyArray<readonly [suffix: string, name: string]> = [
+    ["solo", "Solo"],
+    ["team", "Teams"],
+    ["mega", "Mega"],
+];
+
+export interface SkywarsModeStats {
+    name: string,
+    kills: number,
+    deaths: number,
+    kdr: number,
+    wins: number,
+    losses: number,
+    wlr: number,
+}
+
 export interface SkywarsStats {
     level: number, // 0 when the player has never touched skywars
     levelFormatted: string, // hypixels own rendering, e.g. "§223✦"
@@ -193,6 +264,9 @@ export interface SkywarsStats {
     kills: number,
     deaths: number,
     kdr: number,
+    heads: number,
+    souls: number,
+    modes: SkywarsModeStats[],
 }
 
 // deprecate old xp table since angels descent update i forgot about this
@@ -204,28 +278,49 @@ export function skywarsLevel(levelFormatted: string): number {
 
 export function skywarsStats(player: HypixelPlayer): SkywarsStats {
     const sw = player.stats?.SkyWars ?? {};
+    const n = (key: string): number => (typeof sw[key] === "number" && Number.isFinite(sw[key]) ? sw[key] : 0);
     const levelFormatted: string = typeof sw.levelFormatted === "string" ? sw.levelFormatted : "";
+    const mode = (suffix: string, name: string): SkywarsModeStats => {
+        const kills = n(`kills_${suffix}`);
+        const deaths = n(`deaths_${suffix}`);
+        const wins = n(`wins_${suffix}`);
+        return {
+            name,
+            kills,
+            deaths,
+            kdr: ratio(kills, deaths),
+            wins,
+            losses: n(`losses_${suffix}`),
+            wlr: ratio(wins, n(`losses_${suffix}`)),
+        };
+    };
     return {
         level: skywarsLevel(levelFormatted),
         levelFormatted,
         levelText: stripColorCodes(levelFormatted),
-        wins: sw.wins ?? 0,
-        losses: sw.losses ?? 0,
-        wlr: ratio(sw.wins ?? 0, sw.losses ?? 0),
-        kills: sw.kills ?? 0,
-        deaths: sw.deaths ?? 0,
-        kdr: ratio(sw.kills ?? 0, sw.deaths ?? 0),
+        wins: n("wins"),
+        losses: n("losses"),
+        wlr: ratio(n("wins"), n("losses")),
+        kills: n("kills"),
+        deaths: n("deaths"),
+        kdr: ratio(n("kills"), n("deaths")),
+        heads: n("heads"),
+        souls: n("souls"),
+        modes: SKYWARS_MODES.map(([suffix, name]) => mode(suffix, name)),
     }
 }
 
 // uhc stats
 export interface UhcStats {
     wins: number,
+    winsSolo: number,
+    winsTeams: number,
     kills: number,
     deaths: number,
     kdr: number,
     score: number,
     headsEaten: number,
+    headsEatenSolo: number,
 }
 
 export function uhcStats(player: HypixelPlayer): UhcStats {
@@ -234,11 +329,14 @@ export function uhcStats(player: HypixelPlayer): UhcStats {
     const kills = (uhc.kills ?? 0) + (uhc.kills_solo ?? 0);
     return {
         wins: (uhc.wins ?? 0) + (uhc.wins_solo ?? 0),
+        winsSolo: uhc.wins_solo ?? 0,
+        winsTeams: uhc.wins ?? 0, // the plain wins key is the team mode
         kills,
         deaths: uhc.deaths ?? 0,
         kdr: ratio(kills, uhc.deaths ?? 0),
         score: uhc.score ?? 0, // what the ingame uhc title is based on
-        headsEaten: uhc.heads_eaten ?? 0,
+        headsEaten: (uhc.heads_eaten ?? 0) + (uhc.heads_eaten_solo ?? 0),
+        headsEatenSolo: uhc.heads_eaten_solo ?? 0,
     }
 }
 
@@ -247,22 +345,45 @@ export interface TntGamesStats {
     wins: number,
     winstreak: number,
     tntRun: number,
+    tntRunDeaths: number,
+    tntRunRecord: number,
     pvpRun: number,
+    pvpRunKills: number,
+    pvpRunDeaths: number,
     bowSpleef: number,
+    bowSpleefKills: number,
+    bowSpleefDeaths: number,
     tntTag: number,
+    tntTagKills: number,
+    tntTagDeaths: number,
     wizards: number,
+    wizardsKills: number,
+    wizardsDeaths: number,
+    wizardsPoints: number,
 }
 
 export function tntGamesStats(player: HypixelPlayer): TntGamesStats {
     const tnt = player.stats?.TNTGames ?? {};
+    const n = (key: string): number => (typeof tnt[key] === "number" && Number.isFinite(tnt[key]) ? tnt[key] : 0);
     return {
-        wins: tnt.wins ?? 0,
-        winstreak: tnt.winstreak ?? 0,
-        tntRun: tnt.wins_tntrun ?? 0,
-        pvpRun: tnt.wins_pvprun ?? 0,
-        bowSpleef: tnt.wins_bowspleef ?? 0,
-        tntTag: tnt.wins_tntag ?? 0,
-        wizards: tnt.wins_capture ?? 0,
+        wins: n("wins"),
+        winstreak: n("winstreak"),
+        tntRun: n("wins_tntrun"),
+        tntRunDeaths: n("deaths_tntrun"),
+        tntRunRecord: n("record_tntrun"),
+        pvpRun: n("wins_pvprun"),
+        pvpRunKills: n("kills_pvprun"),
+        pvpRunDeaths: n("deaths_pvprun"),
+        bowSpleef: n("wins_bowspleef"),
+        bowSpleefKills: n("kills_bowspleef"),
+        bowSpleefDeaths: n("deaths_bowspleef"),
+        tntTag: n("wins_tntag"),
+        tntTagKills: n("kills_tntag"),
+        tntTagDeaths: n("deaths_tntag"),
+        wizards: n("wins_capture"),
+        wizardsKills: n("kills_capture"),
+        wizardsDeaths: n("deaths_capture"),
+        wizardsPoints: n("points_capture"),
     }
 }
 
@@ -275,25 +396,28 @@ export interface MurderMysteryStats {
     kills: number,
     deaths: number,
     kdr: number,
+    killsAsMurderer: number,
     murdererWins: number,
     detectiveWins: number,
 }
 
 export function murderMysteryStats(player: HypixelPlayer): MurderMysteryStats {
     const mm = player.stats?.MurderMystery ?? {};
-    const wins = mm.wins ?? 0;
-    const games = mm.games ?? 0;
+    const n = (key: string): number => (typeof mm[key] === "number" && Number.isFinite(mm[key]) ? mm[key] : 0);
+    const wins = n("wins");
+    const games = n("games");
     const losses = Math.max(0, games - wins); // no losses field, games covers it
     return {
         wins,
         games,
         losses,
         wlr: ratio(wins, losses),
-        kills: mm.kills ?? 0,
-        deaths: mm.deaths ?? 0,
-        kdr: ratio(mm.kills ?? 0, mm.deaths ?? 0),
-        murdererWins: mm.murderer_wins ?? 0,
-        detectiveWins: mm.detective_wins ?? 0,
+        kills: n("kills"),
+        deaths: n("deaths"),
+        kdr: ratio(n("kills"), n("deaths")),
+        killsAsMurderer: n("kills_as_murderer"),
+        murdererWins: n("murderer_wins"),
+        detectiveWins: n("detective_wins"),
     }
 }
 
