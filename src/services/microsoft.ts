@@ -3,7 +3,11 @@ import { HttpClient } from "../util/http";
 export async function resolveUuid(http: HttpClient, name: string): Promise<string | undefined> {
   const data = await http.getJson<{ id: string; name: string }>(
     `https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`,
-    { cacheKey: `mojang:${name.toLowerCase()}`, cacheDuration: 60 * 60 * 1000 },
+    {
+      cacheKey: `mojang:${name.toLowerCase()}`,
+      cacheDuration: 60 * 60 * 1000,
+      cacheNullDuration: 5 * 60 * 1000,
+    },
   );
   if (!data?.id) return undefined;
   return dashUuid(data.id);

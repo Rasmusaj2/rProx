@@ -91,6 +91,7 @@ export class HypixelService {
     private windowResetAt = 0; // when the quota rolls over, per RateLimit-Reset
     private remaining = Infinity; // what the last response said was left
     private extras = new TtlCache<unknown>({ defaultTtl: EXTRAS_TTL_MS, maxEntries: 1000 });
+    private inflightExtras = new Map<string, Promise<unknown>>();
 
 
     constructor(private http: HttpClient, private readonly apiKey: string, private readonly ttl = 300_000) {}
@@ -152,10 +153,16 @@ export class HypixelService {
     private cached<T>(key: string, fetch: () => Promise<T | null>): Promise<T | null> {
         const hit = this.extras.get(key);
         if (hit !== undefined) return Promise.resolve(hit as T | null);
-        return fetch().then((value) => {
-            this.extras.set(key, value, EXTRAS_TTL_MS);
-            return value;
-        });
+        const pending = this.inflightExtras.get(key);
+        if (pending) return pending as Promise<T | null>;
+        const promise = fetch()
+            .then((value) => {
+                this.extras.set(key, value, EXTRAS_TTL_MS);
+                return value;
+            })
+            .finally(() => this.inflightExtras.delete(key));
+        this.inflightExtras.set(key, promise);
+        return promise;
     }
 
     private throttled(essential = false): boolean {

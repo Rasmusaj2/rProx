@@ -5,6 +5,7 @@ export interface HttpGet {
     headers?: Record<string, string>;
     cacheKey?: string;
     cacheDuration?: number; // in milliseconds
+    cacheNullDuration?: number;
     timeout?: number; // in milliseconds
 }
 
@@ -24,8 +25,9 @@ export class HttpClient {
     async get<T = unknown>(url: string, options: HttpGet = {}): Promise<T | null> {
         const key = options.cacheKey ?? url;
         const ttl = options.cacheDuration ?? 0;
+        const nullTtl = options.cacheNullDuration ?? 0;
 
-        if (ttl > 0) {
+        if (ttl > 0 || nullTtl > 0) {
             const hit = this.cache.get(key);
             if (hit !== undefined) {
                 this.log.debug(`Cache hit for ${key}`);
@@ -41,15 +43,17 @@ export class HttpClient {
 
         const promise = this.fetch<T>(url, options)
             .then((value) => {
-                if (ttl > 0 && value !== null) {
-                    this.cache.set(key, value, ttl);
+                if (value !== null) {
+                    if (ttl > 0) this.cache.set(key, value, ttl);
+                } else if (nullTtl > 0) {
+                    this.cache.set(key, null, nullTtl);
                 }
                 return value;
             })
             .finally(() => {
                 this.inflightRequests.delete(key);
             });
-        
+
         this.inflightRequests.set(key, promise);
         return promise;
     }
@@ -132,36 +136,39 @@ export class HttpClient {
 
     // fetch json with caching and inflight request deduplication
     async getJson<T = unknown>(url: string, options: HttpGet = {}): Promise<T | null> {
-    const key = options.cacheKey ?? url;
-    const ttl = options.cacheDuration ?? 0;
+        const key = options.cacheKey ?? url;
+        const ttl = options.cacheDuration ?? 0;
+        const nullTtl = options.cacheNullDuration ?? 0;
 
-    if (ttl > 0) {
-      const hit = this.cache.get(key);
-      if (hit !== undefined) return hit as T;
+        if (ttl > 0 || nullTtl > 0) {
+        const hit = this.cache.get(key);
+        if (hit !== undefined) return hit as T;
+        }
+
+        const existing = this.inflightRequests.get(key);
+        if (existing) return existing as Promise<T | null>;
+
+        const p = this.fetch<T>(url, options)
+        .then((value) => {
+            if (value !== null) {
+            if (ttl > 0) this.cache.set(key, value, ttl);
+            } else if (nullTtl > 0) {
+            this.cache.set(key, null, nullTtl);
+            }
+            return value;
+        })
+        .finally(() => this.inflightRequests.delete(key));
+
+        this.inflightRequests.set(key, p as Promise<unknown>);
+        return p;
     }
 
-    const existing = this.inflightRequests.get(key);
-    if (existing) return existing as Promise<T | null>;
+    invalidate(...keys: string[]): void {
+        for (const k of keys) this.cache.delete(k);
+    }
 
-    const p = this.fetch<T>(url, options)
-      .then((value) => {
-        if (ttl > 0 && value !== null) {
-          this.cache.set(key, value, ttl);
-        }
-        return value;
-      })
-      .finally(() => this.inflightRequests.delete(key));
-
-    this.inflightRequests.set(key, p as Promise<unknown>);
-    return p;
-  }
-
-  invalidate(...keys: string[]): void {
-    for (const k of keys) this.cache.delete(k);
-  }
-
-  dispose(): void {
-    this.cache.dispose();
-    this.inflightRequests.clear();
-  }
+    dispose(): void {
+        this.cache.dispose();
+        this.inflightRequests.clear();
+    }
 }
