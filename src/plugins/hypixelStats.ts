@@ -57,6 +57,7 @@ interface HypixelStatsConfig {
     enabled?: boolean;
     apiKey?: string;
     cacheTtlSeconds?: number;
+    tooltipCommands?: Record<string, { game: string; description: string }>;
 }
 
 const DEFAULT_CACHE_SECONDS = 300;
@@ -129,13 +130,85 @@ function duelsMode(session: Session, title: string, m: DuelsModeStats, streaksHi
 
 export const hypixelStatsPlugin: Plugin = {
     name: "hypixelStats",
-    version: "0.1.3",
+    version: "0.1.4",
     description: "Stats from the Hypixel API, every game it reports on.",
 
     defaultConfig: {
         enabled: true,
         apiKey: "",
         cacheTtlSeconds: DEFAULT_CACHE_SECONDS,
+        // every game the plugin knows, keyed by command name. game is the
+        // GameMode whose tag tooltip gets rendered (names from util/tags.ts +
+        // core/game.ts), description shows up in command help. duels and fish
+        // are missing on purpose, they keep their hand written renderers
+        tooltipCommands: {
+            "hypixel": { "game": "general", description: "Network stats for a player (or yourself)" },
+            "bw": { "game": "bedwars", description: "Bedwars stats for a player (or yourself)" },
+            "sw": { "game": "skywars", description: "SkyWars stats for a player (or yourself)" },
+            "uhc": { "game": "uhc", description: "UHC stats for a player (or yourself)" },
+            "tnt": { "game": "tntgames", description: "TNT Games stats for a player (or yourself)" },
+            "mm": { "game": "murdermystery", description: "Murder Mystery stats for a player (or yourself)" },
+
+            "blitz": { "game": "blitz", description: "Blitz SG stats for a player (or yourself)" },
+            "sg": { "game": "blitz", description: "Blitz SG stats for a player (or yourself)" },
+            "cvc": { "game": "cvc", description: "Cops and Crims stats for a player (or yourself)" },
+            "mw": { "game": "megawalls", description: "Mega Walls stats for a player (or yourself)" },
+            "smash": { "game": "smashheroes", description: "Smash Heroes stats for a player (or yourself)" },
+            "warlords": { "game": "warlords", description: "Warlords stats for a player (or yourself)" },
+            "wl": { "game": "warlords", description: "Warlords stats for a player (or yourself)" },
+            "bb": { "game": "buildbattle", description: "Build Battle stats for a player (or yourself)" },
+            "gtb": { "game": "guessthebuild", description: "Guess the Build stats for a player (or yourself)" },
+            "suhc": { "game": "speeduhc", description: "Speed UHC stats for a player (or yourself)" },
+
+            "wool": { "game": "woolgames", description: "Wool Games stats for a player (or yourself)" },
+            "ww": { "game": "woolwars", description: "Wool Wars stats for a player (or yourself)" },
+            "sheep": { "game": "sheepwars", description: "Sheep Wars stats for a player (or yourself)" },
+            "ctw": { "game": "ctw", description: "Capture the Wool stats for a player (or yourself)" },
+
+            "tntrun": { "game": "tntrun", description: "TNT Run stats for a player (or yourself)" },
+            "tnttag": { "game": "tnttag", description: "TNT Tag stats for a player (or yourself)" },
+            "pvprun": { "game": "pvprun", description: "PvP Run stats for a player (or yourself)" },
+            "wizards": { "game": "tntwizards", description: "TNT Wizards stats for a player (or yourself)" },
+            "bowspleef": { "game": "bowspleef", description: "Bow Spleef stats for a player (or yourself)" },
+
+            "arcade": { "game": "arcade", description: "Arcade stats for a player (or yourself)" },
+            "blockingdead": { "game": "blockingdead", description: "Blocking Dead stats for a player (or yourself)" },
+            "bounty": { "game": "bountyhunters", description: "Bounty Hunters stats for a player (or yourself)" },
+            "creeperattack": { "game": "creeperattack", description: "Creeper Attack stats for a player (or yourself)" },
+            "disasters": { "game": "disasters", description: "Disasters stats for a player (or yourself)" },
+            "dragonwars": { "game": "dragonwars", description: "Dragon Wars stats for a player (or yourself)" },
+            "dropper": { "game": "dropper", description: "Dropper stats for a player (or yourself)" },
+            "enderspleef": { "game": "enderspleef", description: "Ender Spleef stats for a player (or yourself)" },
+            "farmhunt": { "game": "farmhunt", description: "Farm Hunt stats for a player (or yourself)" },
+            "football": { "game": "football", description: "Football stats for a player (or yourself)" },
+            "galaxywars": { "game": "galaxywars", description: "Galaxy Wars stats for a player (or yourself)" },
+            "hideandseek": { "game": "hideandseek", description: "Hide and Seek stats for a player (or yourself)" },
+            "hitw": { "game": "holeinthewall", description: "Hole in the Wall stats for a player (or yourself)" },
+            "hypixelsays": { "game": "hypixelsays", description: "Hypixel Says stats for a player (or yourself)" },
+            "miniwalls": { "game": "miniwalls", description: "Mini Walls stats for a player (or yourself)" },
+            "partygames": { "game": "partygames", description: "Party Games stats for a player (or yourself)" },
+            "pixelpainters": { "game": "pixelpainters", description: "Pixel Painters stats for a player (or yourself)" },
+            "pixelparty": { "game": "pixelparty", description: "Pixel Party stats for a player (or yourself)" },
+            "throwout": { "game": "throwout", description: "Throw Out stats for a player (or yourself)" },
+            "zombies": { "game": "zombies", description: "Zombies stats for a player (or yourself)" },
+
+            "eastersim": { "game": "eastersim", description: "Easter Simulator stats for a player (or yourself)" },
+            "grinchsim": { "game": "grinchsim", description: "Grinch Simulator stats for a player (or yourself)" },
+            "santasim": { "game": "santasim", description: "Santa Simulator stats for a player (or yourself)" },
+            "halloweensim": { "game": "halloweensim", description: "Halloween Simulator stats for a player (or yourself)" },
+            "scubasim": { "game": "scubasim", description: "Scuba Simulator stats for a player (or yourself)" },
+
+            "classic": { "game": "classic", description: "Classic Games stats for a player (or yourself)" },
+            "quake": { "game": "quake", description: "Quake stats for a player (or yourself)" },
+            "arena": { "game": "arena", description: "Arena Brawl stats for a player (or yourself)" },
+            "walls": { "game": "thewalls", description: "The Walls stats for a player (or yourself)" },
+            "vampirez": { "game": "vampirez", description: "VampireZ stats for a player (or yourself)" },
+            "vz": { "game": "vampirez", description: "VampireZ stats for a player (or yourself)" },
+            "tkr": { "game": "tkr", description: "Turbo Kart Racers stats for a player (or yourself)" },
+            "pb": { "game": "paintball", description: "Paintball stats for a player (or yourself)" },
+
+            "pit": { "game": "pit", description: "The Pit stats for a player (or yourself)" },
+        },
     },
 
     setup(api) {
@@ -203,32 +276,6 @@ export const hypixelStatsPlugin: Plugin = {
         };
 
         api.registerCommand(
-            "bw",
-            async (args, session) => {
-                const found = await resolve(args, session);
-                if (!found) return;
-                const s = bedwarsStats(found.player);
-                session.chat.text(`${PREFIX} ${found.title} §7- §bBedwars`);
-                session.chat.text(`  §7Star: ${bedwarsStar(s.level).formatted}  §7FKDR: ${tierFormat(s.fkdr, BEDWARS_FKDR)}  §7WLR: ${c("white", s.wlr)}  §7KDR: ${c("white", s.kdr)}`);
-                session.chat.text(`  §7Finals: ${c("white", s.finalKills)}  §7Wins: ${c("white", s.wins)}  §7Winstreak: ${c("white", s.winstreak)}`);
-            },
-            "Bedwars stats for a player (or yourself)",
-        );
-
-        api.registerCommand(
-            "sw",
-            async (args, session) => {
-                const found = await resolve(args, session);
-                if (!found) return;
-                const s = skywarsStats(found.player);
-                session.chat.text(`${PREFIX} ${found.title} §7- §bSkyWars`);
-                session.chat.text(`  §7Level: ${s.levelFormatted || c("gray", "none")}  §7KDR: ${tierFormat(s.kdr, SKYWARS_KDR)}  §7WLR: ${c("white", s.wlr)}`);
-                session.chat.text(`  §7Wins: ${c("white", s.wins)}  §7Kills: ${c("white", s.kills)}`);
-            },
-            "SkyWars stats for a player (or yourself)",
-        );
-
-        api.registerCommand(
             "duels",
             async (args, session) => {
                 const found = await resolve(args, session);
@@ -269,57 +316,6 @@ export const hypixelStatsPlugin: Plugin = {
         );
 
         api.registerCommand(
-            "uhc",
-            async (args, session) => {
-                const found = await resolve(args, session);
-                if (!found) return;
-                const s = uhcStats(found.player);
-                session.chat.text(`${PREFIX} ${found.title} §7- §bUHC`);
-                if (s.wins === 0 && s.kills === 0) {
-                    session.chat.text(`  §7No UHC stats`);
-                    return;
-                }
-                session.chat.text(`  §7Wins: ${tierFormat(s.wins, UHC_WINS)}  §7KDR: ${tierFormat(s.kdr, UHC_KDR)}  §7Score: ${c("white", s.score)}`);
-                session.chat.text(`  §7Kills: ${c("white", s.kills)}  §7Deaths: ${c("white", s.deaths)}  §7Heads eaten: ${c("white", s.headsEaten)}`);
-            },
-            "UHC stats for a player (or yourself)",
-        );
-        api.registerCommand(
-            "tnt",
-            async (args, session) => {
-                const found = await resolve(args, session);
-                if (!found) return;
-                const s = tntGamesStats(found.player);
-                session.chat.text(`${PREFIX} ${found.title} §7- §bTNT Games`);
-                if (s.wins === 0) {
-                    session.chat.text(`  §7No TNT Games stats`);
-                    return;
-                }
-                // no losses are reported anywhere in tnt, so this breaks the wins
-                // down per mode instead of showing a ratio it cannot work out
-                session.chat.text(`  §7Wins: ${tierFormat(s.wins, TNT_TOTAL_WINS)}  §7Winstreak: ${c("white", s.winstreak)}`);
-                session.chat.text(`  §7TNT Run: ${tierFormat(s.tntRun, TNT_RUN_WINS)}  §7PvP Run: ${c("white", s.pvpRun)}  §7Bow Spleef: ${c("white", s.bowSpleef)}`);
-                session.chat.text(`  §7TNT Tag: ${c("white", s.tntTag)}  §7Wizards: ${c("white", s.wizards)}`);
-            },
-            "TNT Games stats for a player (or yourself)",
-        );
-        api.registerCommand(
-            "mm",
-            async (args, session) => {
-                const found = await resolve(args, session);
-                if (!found) return;
-                const s = murderMysteryStats(found.player);
-                session.chat.text(`${PREFIX} ${found.title} §7- §bMurder Mystery`);
-                if (s.wins === 0 && s.games === 0) {
-                    session.chat.text(`  §7No Murder Mystery stats`);
-                    return;
-                }
-                session.chat.text(`  §7Wins: ${tierFormat(s.wins, MM_WINS)}  §7WLR: ${tierFormat(s.wlr, MM_WLR)}  §7KDR: ${c("white", s.kdr)}`);
-                session.chat.text(`  §7Games: ${c("white", s.games)}  §7As murderer: ${c("white", s.murdererWins)}  §7As detective: ${c("white", s.detectiveWins)}`);
-            },
-            "Murder Mystery stats for a player (or yourself)",
-        );
-        api.registerCommand(
             "fish",
             async (args, session) => {
                 const found = await resolve(args, session);
@@ -359,6 +355,51 @@ export const hypixelStatsPlugin: Plugin = {
             },
             "Lobby Fishing stats for a player (or yourself)",
         );
+
+        // commands from map
+        const RENDERED = new Set(["duels", "fish"]);
+        for (const [rawName, rawCommand] of Object.entries(config.tooltipCommands ?? {})) {
+            if (!rawCommand || typeof rawCommand !== "object") {
+                api.log.warn(`tooltipCommands entry "${rawName}": needs { game, description }, skipping it`);
+                continue;
+            }
+            const name = rawName.trim().toLowerCase();
+            const game = (rawCommand.game ?? "").trim();
+            const description = (rawCommand.description ?? "").trim();
+            if (!/^[a-z0-9]+$/.test(name)) {
+                api.log.warn(`tooltipCommands entry "${rawName}": Invalid name (invalid characters)`);
+                continue;
+            }
+            if (RENDERED.has(name)) {
+                api.log.warn(`tooltipCommands entry "${name}": Collides with custom written command`);
+                continue;
+            }
+            if (!game) {
+                api.log.warn(`tooltipCommands entry "${name}": Invalid game (empty)`);
+                continue;
+            }
+            if (!description) {
+                api.log.warn(`tooltipCommands entry "${name}": Invalid description (empty)`);
+                continue;
+            }
+            api.registerCommand(
+                name,
+                async (args, session) => {
+                    const found = await resolve(args, session);
+                    if (!found) return;
+                    const tag = tags.allTags(found.player).find((t) => t.game === game);
+                    if (!tag?.tooltip) {
+                        session.chat.text(`${PREFIX} ${found.title} §7- §b${game}`);
+                        session.chat.text(`  §7No ${game} stats`);
+                        return;
+                    }
+                    const lines = tag.tooltip.split("\n").filter((line) => !line.startsWith("§8via"));
+                    session.chat.text(`${PREFIX} ${found.title} §7- ${lines[0]}`);
+                    for (const line of lines.slice(1)) session.chat.text(`  ${line}`);
+                },
+                description,
+            );
+        }
     },
 };
 
