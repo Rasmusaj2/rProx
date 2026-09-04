@@ -199,7 +199,7 @@ export function rarityColor(rarity?: string): McColorName {
         case "EPIC":
             return "dark_purple";
         case "RARE":
-            return "blue";
+            return "aqua";
         case "COMMON":
             return "white";
         default:
