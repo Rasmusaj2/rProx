@@ -254,7 +254,7 @@ export const sheepwarsTags = (player: HypixelPlayer): Tag[] =>
         return {
             trail: kdr,
             lines: [
-                `§7KDR: ${kdr.formatted}   §7Kills: ${w(num(s, "kills"))}   §7Deaths: ${w(num(s, "deaths"))}}`,
+                `§7KDR: ${kdr.formatted}   §7Kills: ${w(num(s, "kills"))}   §7Deaths: ${w(num(s, "deaths"))}`,
                 `§7WLR: ${ratio(num(s, "wins"), num(s, "losses"))}   Wins: ${w(num(s, "wins"))}   §7Losses: ${w(num(s, "losses"))}`,
                 `§7Sheep thrown: ${w(compact(num(s, "sheep_thrown")))}`,
             ],
