@@ -1,4 +1,5 @@
 import { createLogger } from "../util/log";
+import { TtlCache } from "../util/ttlCache";
 import type { HttpClient } from "../util/http";
 import type { Config } from "../config";
 import { renderPlayerLine } from "./chat";
@@ -34,14 +35,20 @@ export class EnrichmentEngine {
     // "sessionId:name" -> last lookup, debounces repeats. keyed per session on
     // purpose: several people share one instance, and a bare name would let one
     // players lobby check swallow everyone elses line for the same player.
-    private recent = new Map<string, number>();
+    private recent: TtlCache<number>;
 
     constructor(
         private readonly http: HttpClient,
         private readonly config: Config,
         private readonly concurrency = 4,
         private readonly debounceMs = 15_000,
-    ) {}
+    ) {
+        this.recent = new TtlCache<number>({
+            defaultTtl: debounceMs,
+            maxEntries: 4096,
+            sweepIntervalMs: Math.max(1000, Math.floor(debounceMs / 2)),
+        });
+    }
 
     register(enricher: Enricher): void {
         this.enrichers.push(enricher);
@@ -55,7 +62,6 @@ export class EnrichmentEngine {
             if (key.startsWith(prefix)) this.recent.delete(key);
         }
     }
-
     get count(): number {
         return this.enrichers.length;
     }

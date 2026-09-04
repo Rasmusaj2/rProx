@@ -1,4 +1,5 @@
 import type { HttpClient } from '../util/http';
+import { TtlCache } from '../util/ttlCache';
 import type { PlayerRef } from '../core/types';
 import { dashUuid } from '../services/microsoft';
 import { stripColorCodes } from '../util/mcColors';
@@ -83,13 +84,13 @@ const EXTRAS_TTL_MS = 60_000;
 const dashless = (uuid: string): string => uuid.replace(/-/g, "").toLowerCase();
 
 export class HypixelService {
-    private cache = new Map<string, { expires: number; result: PlayerFetch }>();
+    private cache = new TtlCache<PlayerFetch>({ defaultTtl: 300_000, maxEntries: 1000 });
     // one request per player at a time
     private inflight = new Map<string, Promise<PlayerFetch>>();
     private limitedUntil = 0; // nothing goes out before this
     private windowResetAt = 0; // when the quota rolls over, per RateLimit-Reset
     private remaining = Infinity; // what the last response said was left
-    private extras = new Map<string, { expires: number; value: unknown }>();
+    private extras = new TtlCache<unknown>({ defaultTtl: EXTRAS_TTL_MS, maxEntries: 1000 });
 
 
     constructor(private http: HttpClient, private readonly apiKey: string, private readonly ttl = 300_000) {}
@@ -102,7 +103,7 @@ export class HypixelService {
         if (!dashed) return { status: "unresolved" };
         const cacheKey = `hypixel:${dashed}`;
         const cached = this.cache.get(cacheKey);
-        if (cached && cached.expires > Date.now()) return cached.result;
+        if (cached !== undefined) return cached;
 
         const pending = this.inflight.get(cacheKey);
         if (pending) return pending;
@@ -150,9 +151,9 @@ export class HypixelService {
 
     private cached<T>(key: string, fetch: () => Promise<T | null>): Promise<T | null> {
         const hit = this.extras.get(key);
-        if (hit && hit.expires > Date.now()) return Promise.resolve(hit.value as T | null);
+        if (hit !== undefined) return Promise.resolve(hit as T | null);
         return fetch().then((value) => {
-            this.extras.set(key, { expires: Date.now() + EXTRAS_TTL_MS, value });
+            this.extras.set(key, value, EXTRAS_TTL_MS);
             return value;
         });
     }
@@ -179,7 +180,7 @@ export class HypixelService {
         else if (res.data.player) result = { status: "ok", player: res.data.player };
         else result = { status: "no_data" };
 
-        this.cache.set(cacheKey, { expires: Date.now() + this.cacheMsFor(result), result });
+        this.cache.set(cacheKey, result, this.cacheMsFor(result));
         return result;
     }
 

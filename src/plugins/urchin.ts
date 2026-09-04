@@ -3,6 +3,7 @@ import { actionName, hasNpcRank, isFakeUuid } from "../core/lobby";
 import { resolveUuid } from "../services/microsoft";
 import { COLOR_CODES, COLOR_RGB, type McColorName } from "../util/mcColors";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
+import { TtlCache } from "../util/ttlCache";
 
 // blacklist tags from urchin (coral) & seraph anticheater apis
 const URCHIN_BASE = "https://api.urchin.gg";
@@ -249,31 +250,26 @@ export const urchinPlugin: Plugin = {
             return { ok: result.ok, fatal: false, status: result.status, data: result.data };
         }
 
-        interface CacheEntry<T> {
-            expires: number;
-            promise: Promise<T>;
-        }
-
-        const cache = new Map<string, CacheEntry<unknown>>();
+        const cache = new TtlCache<Promise<unknown>>({ defaultTtl: ttl, maxEntries: 2048 });
 
         function cached<T>(cacheKey: string, run: () => Promise<T>): Promise<T> {
-            const hit = cache.get(cacheKey) as CacheEntry<T> | undefined;
-            if (hit && hit.expires > Date.now()) return hit.promise;
+            const hit = cache.get(cacheKey);
+            if (hit) return hit as Promise<T>;
 
-            const entry: CacheEntry<T> = { expires: Date.now() + ttl, promise: undefined as unknown as Promise<T> };
-            entry.promise = run().then(
+            const promise = run().then(
                 (value) => {
-                    entry.expires = Date.now() + ttl;
+                    cache.set(cacheKey, promise, ttl);
                     return value;
                 },
                 (error) => {
-                    entry.expires = Date.now() + FAILED_TTL_MS;
+                    // failures stay cached briefly so a broken key does not hammer the api
+                    cache.set(cacheKey, promise, FAILED_TTL_MS);
                     throw error;
                 },
             );
-            entry.promise.catch(() => {}); // whoever asked handles it, this just keeps node quiet
-            cache.set(cacheKey, entry as CacheEntry<unknown>);
-            return entry.promise;
+            promise.catch(() => {}); // whoever asked handles it, this just keeps node quiet
+            cache.set(cacheKey, promise, ttl);
+            return promise;
         }
 
         // urchin

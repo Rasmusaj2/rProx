@@ -1,9 +1,5 @@
 import {createLogger, type Logger} from "./log";
-
-interface CacheEntry {
-    expires: number,
-    value: unknown
-}
+import { TtlCache } from "./ttlCache";
 
 export interface HttpGet {
     headers?: Record<string, string>;
@@ -13,7 +9,7 @@ export interface HttpGet {
 }
 
 export class HttpClient {
-    private cache = new Map<string, CacheEntry>();
+    private cache = new TtlCache<unknown>({ defaultTtl: 5 * 60_000, maxEntries: 500 });
     private inflightRequests = new Map<string, Promise<unknown>>();
     private log: Logger;
 
@@ -31,9 +27,9 @@ export class HttpClient {
 
         if (ttl > 0) {
             const hit = this.cache.get(key);
-            if (hit && hit.expires > Date.now()) {
+            if (hit !== undefined) {
                 this.log.debug(`Cache hit for ${key}`);
-                return hit.value as T;
+                return hit as T;
             }
         }
 
@@ -45,8 +41,8 @@ export class HttpClient {
 
         const promise = this.fetch<T>(url, options)
             .then((value) => {
-                if (ttl > 0) {
-                    this.cache.set(key, { expires: Date.now() + ttl, value });
+                if (ttl > 0 && value !== null) {
+                    this.cache.set(key, value, ttl);
                 }
                 return value;
             })
@@ -60,7 +56,7 @@ export class HttpClient {
 
     private async fetch<T>(url: string, options: HttpGet): Promise<T | null> {
         const controller = new AbortController();
-        const timeout = options.timeout ?? 5000;
+        const timer = setTimeout(() => controller.abort(), options.timeout ?? 5000);
     
         try {
             const response = await fetch(url, {
@@ -75,7 +71,7 @@ export class HttpClient {
             const data = await response.json();
             return data as T;
         } finally {
-            clearTimeout(timeout);
+            clearTimeout(timer);
         }
     }
 
@@ -141,7 +137,7 @@ export class HttpClient {
 
     if (ttl > 0) {
       const hit = this.cache.get(key);
-      if (hit && hit.expires > Date.now()) return hit.value as T;
+      if (hit !== undefined) return hit as T;
     }
 
     const existing = this.inflightRequests.get(key);
@@ -150,7 +146,7 @@ export class HttpClient {
     const p = this.fetch<T>(url, options)
       .then((value) => {
         if (ttl > 0 && value !== null) {
-          this.cache.set(key, { value, expires: Date.now() + ttl });
+          this.cache.set(key, value, ttl);
         }
         return value;
       })
@@ -162,5 +158,10 @@ export class HttpClient {
 
   invalidate(...keys: string[]): void {
     for (const k of keys) this.cache.delete(k);
+  }
+
+  dispose(): void {
+    this.cache.dispose();
+    this.inflightRequests.clear();
   }
 }
