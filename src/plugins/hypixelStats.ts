@@ -2,7 +2,7 @@ import { PREFIX } from "../core/chat";
 import { isFakeUuid } from "../core/lobby";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
 import {
-    HypixelService,
+    getHypixelService,
     bedwarsStats,
     skywarsStats,
     duelsStats,
@@ -214,7 +214,7 @@ export const hypixelStatsPlugin: Plugin = {
     setup(api) {
         const config = api.pluginConfig as HypixelStatsConfig;
         const ttl = (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000;
-        const hypixel = new HypixelService(api.http, config.apiKey ?? "", ttl); // this is hard to convert to a hard reference unless the HypixelService takes in the entire config object
+        const hypixel = getHypixelService(api.http, config.apiKey ?? "", ttl); // shared instance, see getHypixelService
 
         if (!hypixel.enabled) {
             api.log.warn("no apiKey set, hypixelStats is off (set builtInPlugins.hypixelStats.apiKey)");

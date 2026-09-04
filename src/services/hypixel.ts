@@ -223,6 +223,17 @@ export class HypixelService {
     }
 }
 
+const shared = new Map<string, HypixelService>();
+
+export function getHypixelService(http: HttpClient, apiKey: string, ttl = 300_000): HypixelService {
+    let service = shared.get(apiKey);
+    if (!service) {
+        service = new HypixelService(http, apiKey, ttl);
+        shared.set(apiKey, service);
+    }
+    return service;
+}
+
 export function fetchErrorMessage(status: PlayerFetch["status"]): string {
     switch (status) {
         case "no_key": return "No Hypixel API key available.";

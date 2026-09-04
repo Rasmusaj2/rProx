@@ -1,7 +1,7 @@
 import type { GameMode } from "../core/game";
 import { isFakeUuid } from "../core/lobby";
 import type { Plugin, Session } from "../core/types";
-import { HypixelService, bedwarsStats } from "../services/hypixel";
+import { getHypixelService, bedwarsStats } from "../services/hypixel";
 import { resolveUuid } from "../services/microsoft";
 import { stripColorCodes, type McColorName } from "../util/mcColors";
 
@@ -9,11 +9,9 @@ interface PartyTeamsConfig {
     enabled?: boolean;
     apiKey?: string;
     delaySeconds?: number; // wait after the start line before announcing, lets team packets land
-    cacheTtlSeconds?: number;
 }
 
 const DEFAULT_DELAY_SECONDS = 1;
-const DEFAULT_CACHE_SECONDS = 300;
 const GAME_START_COOLDOWN_MS = 15_000;
 
 const SETTLE_POLL_MS = 500;
@@ -59,12 +57,11 @@ export const partyTeamsPlugin: Plugin = {
     version: "0.1.0",
     description: "Posts combined team stars/fkdr to party chat on Bedwars game start.",
 
-    defaultConfig: {
-        enabled: true,
-        apiKey: "", // empty falls back to builtInPlugins.hypixelStats.apiKey
-        delaySeconds: DEFAULT_DELAY_SECONDS,
-        cacheTtlSeconds: DEFAULT_CACHE_SECONDS,
-    },
+        defaultConfig: {
+            enabled: true,
+            apiKey: "", // empty falls back to builtInPlugins.hypixelStats.apiKey
+            delaySeconds: DEFAULT_DELAY_SECONDS,
+        },
 
     setup(api) {
         const config = api.pluginConfig as PartyTeamsConfig;
@@ -74,7 +71,8 @@ export const partyTeamsPlugin: Plugin = {
             return;
         }
 
-        const hypixel = new HypixelService(api.http, apiKey, (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000);
+        // shared instance, the ttl and ratelimit state live on hypixelStats copy
+        const hypixel = getHypixelService(api.http, apiKey);
         const sessions = new Map<string, SessionState>();
 
         const stateFor = (session: Session): SessionState => {
