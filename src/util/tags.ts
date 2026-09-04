@@ -6,6 +6,8 @@
 // allTags() is what the enricher calls, so a new game only has to be reachable
 // from there - nothing else needs touching
 
+// NOTE: In the future //stat commands will autogenerate from the tooltips here
+
 import type { Tag } from "../core/types";
 import type { GameMode } from "../core/game";
 import {
@@ -64,12 +66,22 @@ export const bedwarsTags = (player: HypixelPlayer): Tag[] => {
     if (s.level === 0 && s.finalKills === 0) return []; // never touched the game, no tags to show
     const star = bedwarsStar(s.level);
     const fkdr = stat(s.fkdr, tiers.BEDWARS_FKDR);
+
+    const modes = s.modes
+        .filter((m) => m.finalKills + m.finalDeaths + m.kills + m.wins > 0)
+        .map((m) =>
+            `§8${m.name}: §7FKDR: ${stat(m.fkdr, tiers.BEDWARS_FKDR).formatted}   §7WLR: ${w(m.wlr)}   §7BBLR: ${w(m.bblr)}` +
+            `§7Finals: ${w(m.finalKills)}   §7Wins: ${w(m.wins)}   §7Kills: ${w(m.kills)}   §7Beds: ${w(m.bedsBroken)}`,);
     return gameTags(
         "bedwars",
         [
             `§7Bedwars ${star.formatted}`,
-            `§7FKDR: ${fkdr.formatted}   §7WLR: ${w(s.wlr)}`,
-            `§7Finals: ${w(s.finalKills)}   §7WS: ${w(s.winstreak)}`,
+            `§7FKDR: ${fkdr.formatted}   §7WLR: ${w(s.wlr)}   §7KDR: ${w(s.kdr)}   §7BBLR: ${w(s.bblr)}`,
+            `§7Finals: ${w(s.finalKills)}   §7Final deaths: ${w(s.finalDeaths)}   §7Winstreak: ${w(s.winstreak)}`,
+            `§7Wins: ${w(s.wins)}   §7Losses: ${w(s.losses)}   §7Games: ${w(s.gamesPlayed)}`,
+            `§7Kills: ${w(s.kills)}   §7Deaths: ${w(s.deaths)}`,
+            `§7Beds Broken: ${w(s.bedsBroken)}   §7Beds Lost: ${w(s.bedsLost)}`,
+            ...modes,
         ],
         star,
         fkdr,
@@ -83,12 +95,19 @@ export const skywarsTags = (player: HypixelPlayer): Tag[] => {
         ? ownStat(s.levelText, s.levelFormatted, firstColor(s.levelFormatted) ?? "gray")
         : undefined;
     const kdr = stat(s.kdr, tiers.SKYWARS_KDR);
+    const modes = s.modes
+        .filter((m) => m.kills + m.wins + m.deaths > 0)
+        .map((m) =>
+            `§8${m.name}: §7KDR: ${stat(m.kdr, tiers.SKYWARS_KDR).formatted}   §7WLR: ${w(m.wlr)}   ` +
+            `§7Wins: ${w(m.wins)}   §7Losses: ${w(m.losses)}   §7Kills: ${w(m.kills)}`);
     return gameTags(
         "skywars",
         [
             `§7SkyWars ${s.levelFormatted || w("no level")}`,
             `§7KDR: ${kdr.formatted}   §7WLR: ${w(s.wlr)}`,
-            `§7Wins: ${w(s.wins)}   §7Kills: ${w(s.kills)}`,
+            `§7Wins: ${w(s.wins)}   §7Losses: ${w(s.losses)}   §7Kills: ${w(s.kills)}`,
+            `§7Deaths: ${w(s.deaths)}   §7Heads: ${w(s.heads)}   §7Souls: ${w(compact(s.souls))}`,
+            ...modes,
         ],
         level,
         kdr,
@@ -100,14 +119,20 @@ export const duelsTags = (player: HypixelPlayer): Tag[] => {
     if (s.wins === 0 && s.losses === 0) return [];
     const wins = stat(s.wins, tiers.DUELS_WINS, { label: "W" });
     const wlr = stat(s.wlr, tiers.DUELS_WLR);
+    const categories = [...s.categories]
+        .sort((a, b) => b.combined.wins - a.combined.wins)
+        .map((c) => `§8${c.name}: §7Wins: ${w(c.combined.wins)}   §7WLR: ${w(c.combined.wlr)}`);
     return gameTags(
         "duels",
         [
             `§7Duels ${wins.formatted}${s.division ? ` §8(${s.division.label})` : ""}`,
-            `§7WLR: ${wlr.formatted}   §7KDR: ${w(s.kdr)}`,
+            `§7WLR: ${wlr.formatted}   §7KDR: ${w(s.kdr)}   §7Games: ${w(s.gamesPlayed)}`,
             s.winstreaksHidden
                 ? `§7Winstreak: §8hidden`
                 : `§7Winstreak: ${w(s.currentWinstreak)}   §7Best: ${w(s.bestWinstreak)}`,
+            `§7Kills: ${w(s.kills)}   §7Deaths: ${w(s.deaths)}   §7Goals: ${w(s.goals)}`,
+            `§7Melee: ${w(`${s.meleeAccuracy}%`)}   §7Bow: ${w(`${s.bowAccuracy}%`)}   §7Coins: ${w(compact(s.coins))}`,
+            ...categories,
         ],
         wins,
         wlr,
@@ -124,7 +149,7 @@ export const uhcTags = (player: HypixelPlayer): Tag[] => {
         [
             `§7UHC ${wins.formatted} §8(score ${s.score})`,
             `§7KDR: ${kdr.formatted}   §7Kills: ${w(s.kills)}   §7Deaths: ${w(s.deaths)}`,
-            `§7Heads eaten: ${w(s.headsEaten)}`,
+            `§7Solo wins: ${w(s.winsSolo)}   §7Team wins: ${w(s.winsTeams)}   §7Heads eaten: ${w(s.headsEaten)}`,
         ],
         wins,
         kdr,
@@ -140,8 +165,9 @@ export const tntgamesTags = (player: HypixelPlayer): Tag[] => {
         "tntgames",
         [
             `§7TNT Games ${wins.formatted} §8(streak ${s.winstreak})`,
-            `§7TNT Run: ${tntRun.formatted}   §7PvP Run: ${w(s.pvpRun)}`,
-            `§7Wizards: ${w(s.wizards)}   §7Bow Spleef: ${w(s.bowSpleef)}   §7TNT Tag: ${w(s.tntTag)}`,
+            `§7TNT Run: ${tntRun.formatted}   §7PvP Run: ${w(s.pvpRun)}   §7Bow Spleef: ${w(s.bowSpleef)}`,
+            `§7Wizards: ${w(s.wizards)}   §7TNT Tag: ${w(s.tntTag)}`,
+            `§7PvP kills: ${w(s.pvpRunKills)}   §7Tag kills: ${w(s.tntTagKills)}   §7Wizards kills: ${w(s.wizardsKills)}`,
         ],
         wins,
     );
@@ -156,8 +182,9 @@ export const murdermysteryTags = (player: HypixelPlayer): Tag[] => {
         "murdermystery",
         [
             `§7Murder Mystery ${wins.formatted} §8(${s.games} games)`,
-            `§7WLR: ${wlr.formatted}   §7KDR: ${w(s.kdr)}`,
-            `§7As murderer: ${w(s.murdererWins)}   §7As detective: ${w(s.detectiveWins)}`,
+            `§7WLR: ${wlr.formatted}   §7KDR: ${w(s.kdr)}   §7Losses: ${w(s.losses)}`,
+            `§7Kills: ${w(s.kills)}   §7Deaths: ${w(s.deaths)}   §7As murderer: ${w(s.killsAsMurderer)}`,
+            `§7Murderer wins: ${w(s.murdererWins)}   §7Detective wins: ${w(s.detectiveWins)}`,
         ],
         wins,
         wlr,
@@ -178,8 +205,8 @@ export const fishingTags = (player: HypixelPlayer): Tag[] => {
         [
             `§7Fishing ${mythical.formatted} §8(${s.totalCatches.toLocaleString()} catches)`,
             `§7Fish: ${w(s.fishCaught.toLocaleString())}   §7Treasure: ${w(s.treasureCaught.toLocaleString())}   §7Junk: ${w(s.junkCaught.toLocaleString())}`,
+            `§7Plants: ${w(s.plantsCaught.toLocaleString())}   §7Creatures: ${w(s.creaturesCaught.toLocaleString())}   §7Special: ${w(s.specialCaught)}`,
             areas,
-            `§7Special: ${w(s.specialCaught)}   §7Plants: ${w(s.plantsCaught)}`,
         ],
         mythical,
         catches,
@@ -207,10 +234,12 @@ const woolModeTags = (
 export const woolwarsTags = (player: HypixelPlayer): Tag[] =>
     woolModeTags(player, "woolwars", "Wool Wars", "wool_wars", (s) => {
         const kdr = stat(ratio(num(s, "kills"), num(s, "deaths")), tiers.WOOL_WARS_KDR);
+        const losses = Math.max(0, num(s, "games_played") - num(s, "wins"));
         return {
             trail: kdr,
             lines: [
-                `§7KDR: ${kdr.formatted}   §7Wins: ${w(num(s, "wins"))}   §7Losses: ${w(num(s, "losses"))}`,
+                `§7KDR: ${kdr.formatted}   §7Wins: ${w(num(s, "wins"))}   §7Losses: ${w(losses)}`,
+                `§7Kills: ${w(num(s, "kills"))}   §7Deaths: ${w(num(s, "deaths"))}   §7Assists: ${w(num(s, "assists"))}`,
                 `§7Blocks broken: ${w(compact(num(s, "blocks_broken")))}   §7Wool placed: ${w(compact(num(s, "wool_placed")))}`,
             ],
         };
@@ -222,7 +251,8 @@ export const sheepwarsTags = (player: HypixelPlayer): Tag[] =>
         return {
             trail: kdr,
             lines: [
-                `§7KDR: ${kdr.formatted}   §7Wins: ${w(num(s, "wins"))}   §7Losses: ${w(num(s, "losses"))}`,
+                `§7KDR: ${kdr.formatted}   §7Kills: ${w(num(s, "kills"))}   §7Deaths: ${w(num(s, "deaths"))}}`,
+                `§7WLR: ${ratio(num(s, "wins"), num(s, "losses"))}   Wins: ${w(num(s, "wins"))}   §7Losses: ${w(num(s, "losses"))}`,
                 `§7Sheep thrown: ${w(compact(num(s, "sheep_thrown")))}`,
             ],
         };
@@ -235,7 +265,8 @@ export const ctwTags = (player: HypixelPlayer): Tag[] =>
             trail: kdr,
             lines: [
                 `§7KDR: ${kdr.formatted}   §7Wins: ${w(num(s, "participated_wins"))}   §7Losses: ${w(num(s, "participated_losses"))}`,
-                `§7Wools captured: ${w(num(s, "wools_captured"))}   §7Gold: ${w(compact(num(s, "gold_earned")))}`,
+                `§7Kills: ${w(num(s, "kills"))}   §7Deaths: ${w(num(s, "deaths"))}   §7Assists: ${w(num(s, "assists"))}`,
+                `§7Wools captured: ${w(num(s, "wools_captured"))}   §7Wools stolen: ${w(num(s, "wools_stolen"))}   §7Gold: ${w(compact(num(s, "gold_earned")))}`,
             ],
         };
     });
@@ -249,15 +280,17 @@ export const woolgamesTags = (player: HypixelPlayer): Tag[] => {
     const ww = inner(wool, "wool_wars", "stats");
     const sheep = inner(wool, "sheep_wars", "stats");
     const ctw = inner(wool, "capture_the_wool", "stats");
-    const wins = stat(num(ww , "wins") + num(sheep, "wins") + num(ctw, "participated_wins"), tiers.WOOL_WARS_WINS, { label: "W" });
+    const kills = num(ww, "kills") + num(sheep, "kills") + num(ctw, "kills");
+    const deaths = num(ww, "deaths") + num(sheep, "deaths") + num(ctw, "deaths");
+    const wwLosses = Math.max(0, num(ww, "games_played") - num(ww, "wins"));
+    const wins = stat(num(ww, "wins") + num(sheep, "wins") + num(ctw, "participated_wins"), tiers.WOOL_WARS_WINS, { label: "W" });
     return gameTags(
         "woolgames",
         [
             `§7Wool Games ${star.formatted}`,
-            `§7Wool Wars wins: ${wins.formatted}   §7Losses: ${w(num(ww, "losses"))}`,
-            `§7Sheep Wars wins: ${w(num(sheep, "wins"))}`,
-            `§7CTW wins: ${w(num(ctw, "participated_wins"))}`,
-            `§7Coins: ${w(compact(num(wool, "coins")))}`,
+            `§7Wool Wars wins: ${wins.formatted}   §7Losses: ${w(wwLosses)}`,
+            `§7Sheep Wars wins: ${w(num(sheep, "wins"))}   §7CTW wins: ${w(num(ctw, "participated_wins"))}`,
+            `§7Kills: ${w(kills)}   §7Deaths: ${w(deaths)}   §7Coins: ${w(compact(num(wool, "coins")))}`,
         ],
         star,
         wins,
@@ -278,6 +311,7 @@ export const arcadeTags = (player: HypixelPlayer): Tag[] => {
             `§7Arcade ${head.formatted} §8(every mode added up)`,
             `§7Coins: ${purse.formatted}`,
             `§7Zombies: ${w(num(raw, "wins_zombies"))}   §7Party Games: ${w(total(raw, "wins_party", "wins_party_2", "wins_party_3"))}   §7Dropper: ${w(num(inner(raw, "dropper"), "wins"))}`,
+            `§7Blocking Dead: ${w(num(raw, "wins_dayone"))}   §7Galaxy Wars: ${w(num(raw, "sw_game_wins"))}   §7Farm Hunt: ${w(num(raw, "wins_farm_hunt"))}`,
         ],
         head,
         purse,
@@ -299,17 +333,23 @@ export const classicTags = (player: HypixelPlayer): Tag[] => {
     let kills = 0;
     for (const [name, winKeys, killKeys] of CLASSICS) {
         const raw = block(player, name);
-        wins += total(raw, ...winKeys)
+        wins += total(raw, ...winKeys);
+        kills += total(raw, ...killKeys);
     }
     if (wins === 0 && kills === 0) return [];
     const head = stat(wins, tiers.CLASSIC_WINS, { label: "W" });
     const kill = stat(kills, tiers.CLASSIC_KILLS, { label: "K", short: true });
+    const quake = total(block(player, "Quake"), "wins", "wins_teams");
+    const arena = total(block(player, "Arena"), "wins_1v1", "wins_2v2", "wins_4v4");
+    const vampirez = total(block(player, "VampireZ"), "human_wins", "vampire_wins");
+    const tkr = num(block(player, "GingerBread"), "wins");
     return gameTags(
         "classic",
         [
             `§7Classic Games ${head.formatted}`,
             `§7Kills: ${kill.formatted}`,
-            `§7Quake: ${w(total(block(player, "Quake"), "wins", "wins_teams"))}   §7Paintball: ${w(num(block(player, "Paintball"), "wins"))}   §7Walls: ${w(num(block(player, "Walls"), "wins"))}`,
+            `§7Quake: ${w(quake)}   §7Paintball: ${w(num(block(player, "Paintball"), "wins"))}   §7Walls: ${w(num(block(player, "Walls"), "wins"))}`,
+            `§7VampireZ: ${w(vampirez)}   §7Arena: ${w(arena)}   §7TKR: ${w(tkr)}`,
         ],
         head,
     );
@@ -398,14 +438,27 @@ const SPECS = {
         block: "HungerGames",
         head: wins(tiers.BLITZ_WINS, "wins", "wins_teams"),
         trail: kdr(tiers.BLITZ_KDR),
-        lines: [count("Kills", "kills"), count("Deaths", "deaths"), count("Coins", "coins", true)],
+        lines: [
+            count("Kills", "kills"),
+            count("Deaths", "deaths"),
+            count("Solo wins", "wins"),
+            count("Team wins", "wins_teams"),
+            count("Chests", "chests_opened", true),
+            count("Coins", "coins", true),
+        ],
     },
     buildbattle: {
         title: "Build Battle",
         block: "BuildBattle",
         head: wins(tiers.BUILDBATTLE_WINS, "wins"),
         trail: { label: "Score", keys: ["score"], tiers: tiers.BUILDBATTLE_SCORE, mark: "S", big: true },
-        lines: [count("Games", "games_played"), count("Guesses", "correct_guesses"), count("Pro wins", "wins_solo_pro")],
+        lines: [
+            count("Games", "games_played"),
+            count("Votes", "total_votes", true),
+            count("Guesses", "correct_guesses"),
+            count("Pro wins", "wins_solo_pro"),
+            count("Team wins", "wins_teams"),
+        ],
     },
     guessthebuild: {
         title: "Guess the Build",
@@ -419,28 +472,50 @@ const SPECS = {
         block: "MCGO",
         head: wins(tiers.CVC_WINS, "game_wins"),
         trail: kdr(tiers.CVC_KDR),
-        lines: [count("Kills", "kills"), count("Deaths", "deaths"), count("Headshots", "headshot_kills")],
+        lines: [
+            count("Kills", "kills"),
+            count("Deaths", "deaths"),
+            count("Headshots", "headshot_kills"),
+            count("Round wins", "round_wins"),
+            count("Bombs defused", "bombs_defused"),
+            count("Bombs planted", "bombs_planted"),
+        ],
     },
     megawalls: {
         title: "Mega Walls",
         block: "Walls3",
         head: wins(tiers.MEGAWALLS_WINS, "wins"),
         trail: { label: "FKDR", over: ["final_kills"], under: ["final_deaths"], tiers: tiers.MEGAWALLS_FKDR },
-        lines: [count("Finals", "final_kills"), count("Kills", "kills"), count("Losses", "losses")],
+        lines: [
+            count("Finals", "final_kills"),
+            count("Final deaths", "final_deaths"),
+            count("Kills", "kills"),
+            count("Deaths", "deaths"),
+            count("Losses", "losses"),
+            count("Assists", "assists"),
+            count("Wither dmg", "wither_damage", true),
+        ],
     },
     smashheroes: {
         title: "Smash Heroes",
         block: "SuperSmash",
         head: { label: "Level", keys: ["smashLevel"], tiers: tiers.SMASH_LEVEL },
         trail: kdr(tiers.SMASH_KDR),
-        lines: [count("Wins", "wins"), count("Kills", "kills"), count("Deaths", "deaths")],
+        lines: [count("Wins", "wins"), count("Losses", "losses"), count("Kills", "kills"), count("Deaths", "deaths")],
     },
     warlords: {
         title: "Warlords",
         block: "Battleground",
         head: wins(tiers.WARLORDS_WINS, "wins"),
         trail: kdr(tiers.WARLORDS_KDR),
-        lines: [count("Losses", "losses"), count("Kills", "kills"), count("Assists", "assists")],
+        lines: [
+            count("Losses", "losses"),
+            count("Kills", "kills"),
+            count("Deaths", "deaths"),
+            count("Assists", "assists"),
+            count("Damage", "damage", true),
+            count("Healing", "heal", true),
+        ],
     },
 
     // uhc
@@ -449,7 +524,13 @@ const SPECS = {
         block: "SpeedUHC",
         head: wins(tiers.SPEEDUHC_WINS, "wins"),
         trail: kdr(tiers.SPEEDUHC_KDR),
-        lines: [count("Score", "score"), count("Kills", "kills"), count("Winstreak", "winstreak|highestWinstreak")],
+        lines: [
+            count("Score", "score"),
+            count("Kills", "kills"),
+            count("Deaths", "deaths"),
+            count("Losses", "losses"),
+            count("Winstreak", "winstreak|highestWinstreak"),
+        ],
     },
 
     // tnt games, one row per mode. the trailing slot is the whole games win
@@ -458,25 +539,30 @@ const SPECS = {
         title: "TNT Run",
         block: "TNTGames",
         head: wins(tiers.TNT_RUN_WINS, "wins_tntrun"),
-        lines: [count("Record", "record_tntrun"), count("PvP Run", "wins_pvprun")],
+        lines: [count("Record", "record_tntrun"), count("Deaths", "deaths_tntrun"), count("PvP Run", "wins_pvprun")],
     },
     tnttag: {
         title: "TNT Tag",
         block: "TNTGames",
         head: wins(tiers.TNTTAG_WINS, "wins_tntag"),
-        lines: [count("Kills", "kills_tntag"), count("TNT Run", "wins_tntrun")],
+        lines: [count("Kills", "kills_tntag"), count("Deaths", "deaths_tntag"), count("TNT Run", "wins_tntrun")],
     },
     pvprun: {
         title: "PvP Run",
         block: "TNTGames",
         head: wins(tiers.PVPRUN_WINS, "wins_pvprun"),
-        lines: [count("Kills", "kills_pvprun"), count("Deaths", "deaths_pvprun")],
+        lines: [count("Kills", "kills_pvprun"), count("Deaths", "deaths_pvprun"), count("Record", "record_pvprun")],
     },
     tntwizards: {
         title: "TNT Wizards",
         block: "TNTGames",
         head: wins(tiers.WIZARDS_WINS, "wins_tntwizards"),
-        lines: [count("Kills", "kills_capture"), count("Deaths", "deaths_capture"), count("Points", "points_capture")],
+        lines: [
+            count("Kills", "kills_capture"),
+            count("Deaths", "deaths_capture"),
+            count("Assists", "assists_capture"),
+            count("Points", "points_capture"),
+        ],
     },
     bowspleef: {
         title: "Bow Spleef",
@@ -549,7 +635,7 @@ const SPECS = {
             mark: "K",
             big: true,
         },
-        lines: [count("Poop", "poop_collected"), count("Taunts", "taunts_used")],
+        lines: [count("Animal kills", "animal_kills_farm_hunt"), count("Poop", "poop_collected"), count("Taunts", "taunts_used")],
     },
     football: {
         title: "Football",
@@ -604,7 +690,10 @@ const SPECS = {
         trail: kdr(tiers.MINIWALLS_KDR, "kills_mini_walls", "deaths_mini_walls"),
         lines: [
             count("Finals", "final_kills_mini_walls"),
+            count("Kills", "kills_mini_walls"),
+            count("Deaths", "deaths_mini_walls"),
             count("Wither kills", "wither_kills_mini_walls"),
+            count("Wither dmg", "wither_damage_mini_walls"),
             count("Arrows hit", "arrows_hit_mini_walls"),
         ],
     },
@@ -652,7 +741,13 @@ const SPECS = {
             mark: "K",
             big: true,
         },
-        lines: [count("Rounds", "total_rounds_survived_zombies"), count("Best round", "best_round_zombies")],
+        lines: [
+            count("Deaths", "deaths_zombies"),
+            count("Doors", "doors_opened_zombies"),
+            count("Revives", "players_revived_zombies"),
+            count("Rounds", "total_rounds_survived_zombies"),
+            count("Best round", "best_round_zombies"),
+        ],
     },
 
     // simulators, all of them live in the arcade block too
@@ -709,7 +804,13 @@ const SPECS = {
         block: "Quake",
         head: wins(tiers.QUAKE_WINS, "wins", "wins_teams"),
         trail: { label: "Kills", keys: ["kills", "kills_teams"], tiers: tiers.QUAKE_KILLS, mark: "K", big: true },
-        lines: [count("Deaths", "deaths", true), count("Headshots", "headshots", true), count("Killstreaks", "killstreaks")],
+        lines: [
+            { label: "KDR", over: ["kills", "kills_teams"], under: ["deaths", "deaths_teams"] },
+            count("Deaths", "deaths|deaths_teams", true),
+            count("Headshots", "headshots|headshots_teams", true),
+            count("Killstreaks", "killstreaks"),
+            count("Best streak", "highest_killstreak"),
+        ],
     },
     arena: {
         title: "Arena Brawl",
@@ -721,14 +822,24 @@ const SPECS = {
             under: ["deaths_1v1", "deaths_2v2", "deaths_4v4"],
             tiers: tiers.ARENA_KDR,
         },
-        lines: [count("Rating", "rating"), count("Coins", "coins", true)],
+        lines: [
+            count("Kills", "kills_1v1|kills_2v2|kills_4v4"),
+            count("Deaths", "deaths_1v1|deaths_2v2|deaths_4v4"),
+            count("Rating", "rating"),
+            count("Coins", "coins", true),
+        ],
     },
     thewalls: {
         title: "The Walls",
         block: "Walls",
         head: wins(tiers.WALLS_WINS, "wins"),
         trail: kdr(tiers.WALLS_KDR),
-        lines: [count("Losses", "losses"), count("Kills", "kills"), count("Deaths", "deaths")],
+        lines: [
+            count("Losses", "losses"),
+            count("Kills", "kills"),
+            count("Deaths", "deaths"),
+            count("Assists", "assists"),
+        ],
     },
     vampirez: {
         title: "VampireZ",
@@ -737,8 +848,11 @@ const SPECS = {
         trail: kdr(tiers.VAMPIREZ_HUMAN_KDR, "vampire_kills", "human_deaths"),
         lines: [
             count("Vampire wins", "vampire_wins"),
-            count("Zombie kills", "zombie_kills", true),
             count("Human kills", "human_kills"),
+            count("Vampire kills", "vampire_kills", true),
+            count("Zombie kills", "zombie_kills", true),
+            count("Human deaths", "human_deaths", true),
+            count("Vampire deaths", "vampire_deaths", true),
         ],
     },
     tkr: {
@@ -751,7 +865,14 @@ const SPECS = {
             tiers: tiers.TKR_TROPHIES,
             mark: "T",
         },
-        lines: [count("Laps", "laps_completed"), count("Boxes", "box_pickups"), count("Coins", "coins", true)],
+        lines: [
+            count("Gold", "gold_trophy"),
+            count("Silver", "silver_trophy"),
+            count("Bronze", "bronze_trophy"),
+            count("Laps", "laps_completed"),
+            count("Boxes", "box_pickups"),
+            count("Coins", "coins", true),
+        ],
     },
     paintball: {
         title: "Paintball",
@@ -762,6 +883,7 @@ const SPECS = {
             count("Kills", "kills", true),
             count("Deaths", "deaths", true),
             count("Shots", "shots_fired", true),
+            count("Killstreaks", "killstreaks"),
         ],
     },
 
