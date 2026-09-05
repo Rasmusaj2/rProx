@@ -57,6 +57,7 @@ export class PluginManager {
             config: this.config,
             log: createLogger(`plugin:${plugin.name}`),
             http: this.http,
+            enrichment: this.enrichment,
             pluginConfig: this.pluginConfig(plugin.name),
             on: (event, handler) => this.bus.on(event, handler), // handle subscription events for the plugin
             registerEnricher: (enricher) => this.enrichment.register(enricher), // enricher voodoo plugin magic

@@ -4,6 +4,7 @@ import type { McColorName } from "../util/mcColors";
 import type { Config } from "../config";
 import type { GameMode } from "./game";
 import type { WindowApi } from "../interface/windowApi";
+import type { EnrichmentEngine } from "./enrichment";
 
 export interface PlayerRef {
     name: string;
@@ -96,6 +97,7 @@ export interface PluginApi {
     config: Config;
     log: Logger;
     http: HttpClient;
+    enrichment: EnrichmentEngine; // shared engine, same enrichers + caches the builtin plugins use
     pluginConfig: Record<string, unknown>; // config.builtInPlugins[name]
     on<K extends keyof ProxyEvents>(event: K, handler: ProxyEvents[K]): void;
     registerEnricher(enricher: Enricher): void;

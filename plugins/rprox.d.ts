@@ -10,6 +10,8 @@ declare module "rprox" {
     export * from "../src/interface/sidebarApi";
     export * from "../src/interface/windowApi";
     export * as colors from "../src/util/mcColors";
+    export type { EnrichmentEngine, Collected } from "../src/core/enrichment";
+    export type { Plugin, PluginApi, Tag, PlayerRef, Session, ChatMessage, DetectSource } from "../src/core/types";
 }
 
 declare module "rprox/sidebar" {
