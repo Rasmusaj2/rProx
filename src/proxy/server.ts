@@ -7,6 +7,7 @@ import type { EventBus } from "../core/events";
 import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
 import { LobbyTracker, parseWhoResponse, type PlayerInfoPacket } from "../core/lobby";
+import { dashUuid } from "../services/microsoft";
 import { makeChatInjector, parseChat, PREFIX } from "../core/chat";
 import { createWindowApi } from "../interface/windowApi";
 import type { ChatMessage, Session } from "../core/types";
@@ -173,6 +174,7 @@ export class ProxyServer {
         const session: Session = { // player sessions
             id,
             username: client.username,
+            uuid: dashUuid(uuid).toLowerCase(),
             chat: makeChatInjector(client),
             game: "unknown", // nametagStats fills this in off the scoreboard and we dont have a scoreboard yet - also irrelevant anyways if nametagStats is off
             lobby: true,

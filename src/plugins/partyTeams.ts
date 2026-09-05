@@ -180,7 +180,6 @@ export const partyTeamsPlugin: Plugin = {
 
         const announce = async (session: Session, state: SessionState): Promise<void> => {
             api.log.debug(`partyTeams announce for ${session.username}'s session, ${state.teams.size} scoreboard teams`);
-            const self = session.username.toLowerCase();
             const teams = gameTeams(state);
             if (teams.size === 0) {
                 const dump = [...state.teams.entries()]
@@ -213,7 +212,7 @@ export const partyTeamsPlugin: Plugin = {
 
                 const stars = got.reduce((sum, s) => sum + s.level, 0);
                 const fkdr = got.reduce((sum, s) => sum + s.fkdr, 0);
-                const us = members.some((member) => member.toLowerCase() === self);
+                const us = members.some((member) => state.uuids.get(member.toLowerCase()) === session.uuid);
 
                 const line =
                     `[${team.label}] ${us ? "(US) " : ""}- ✫${stars} - ${fkdr.toFixed(2)} FKDR` +

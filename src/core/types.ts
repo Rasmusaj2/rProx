@@ -52,6 +52,7 @@ export interface ChatInjector {
 export interface Session {
     readonly id: string;
     readonly username: string;
+    readonly uuid: string; // the client account uuid, matches tab list uuids
     readonly chat: ChatInjector;
     game: GameMode; // active game, detected and kept up to date by nametagStats
     lobby: boolean;
