@@ -17,6 +17,8 @@ const GAME_START_COOLDOWN_MS = 15_000;
 const SETTLE_POLL_MS = 500;
 const SETTLE_POLL_MAX = 10;
 
+const SEND_DELAY_MS = 500;
+
 const GAME_START_PATTERN = "Protect your bed and destroy the enemy beds.";
 
 // remembering s for gray cause green has g
@@ -197,6 +199,7 @@ export const partyTeamsPlugin: Plugin = {
                 }),
             );
 
+            let sent = false;
             for (const [letter, players] of teams) {
                 const team = TEAM_LETTERS[letter];
                 const members = membersOf(players);
@@ -215,7 +218,9 @@ export const partyTeamsPlugin: Plugin = {
                 const line =
                     `[${team.label}] ${us ? "(US) " : ""}- ✫${stars} - ${fkdr.toFixed(2)} FKDR` +
                     (nicks > 0 ? ` (${nicks} nick${nicks === 1 ? "" : "s"})` : "");
+                if (sent) await new Promise((resolve) => setTimeout(resolve, SEND_DELAY_MS));
                 session.sendUpstream(`/pc ${line}`);
+                sent = true;
             }
         };
 
