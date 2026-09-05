@@ -508,7 +508,9 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     const suffix = render.suffix(tags, MAX_TAB_SUFFIX);
                     // no reason to send a packet if nothing changed
                     if (!prefix && !suffix && !current.applied) return;
-                    const display = prefix + tabBase(state, current) + suffix;
+                    const base = tabBase(state, current);
+                    const decorated = prefix && !hasColorCode(base) ? `§f${base}` : base;
+                    const display = prefix + decorated + suffix;
                     if (display === current.applied) return;
                     current.applied = prefix || suffix ? display : undefined;
                     session.sendPacket("player_info", {
@@ -706,7 +708,8 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                         (current.color >= 0 && current.color <= 15
                             ? colorFromCode(current.color.toString(16))
                             : undefined);
-                    const tail = nameColor ? COLOR_CODES[nameColor] : "";
+                    // we preserve white color if there's no color since it would be gray from the brackets otherwise
+                    const tail = COLOR_CODES[nameColor ?? "white"];
                     // budget the color back in up front so a prefix that doesnt fit
                     // sheds its lowest priority tag instead of dropping out whole
                     const ours = render.prefix(tags, MAX_TEAM_FIELD - tail.length);
