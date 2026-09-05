@@ -57,8 +57,77 @@ interface HypixelStatsConfig {
     enabled?: boolean;
     apiKey?: string;
     cacheTtlSeconds?: number;
-    tooltipCommands?: Record<string, { game: string; description: string }>;
 }
+
+// autogenerates commands for every game based on tooltips from tags
+const autogen = {
+            "hypixel": { "game": "general", description: "Network stats for a player (or yourself)" },
+            "bw": { "game": "bedwars", description: "Bedwars stats for a player (or yourself)" },
+            "sw": { "game": "skywars", description: "SkyWars stats for a player (or yourself)" },
+            "uhc": { "game": "uhc", description: "UHC stats for a player (or yourself)" },
+            "tnt": { "game": "tntgames", description: "TNT Games stats for a player (or yourself)" },
+            "mm": { "game": "murdermystery", description: "Murder Mystery stats for a player (or yourself)" },
+
+            "blitz": { "game": "blitz", description: "Blitz SG stats for a player (or yourself)" },
+            "sg": { "game": "blitz", description: "Blitz SG stats for a player (or yourself)" },
+            "cvc": { "game": "cvc", description: "Cops and Crims stats for a player (or yourself)" },
+            "mw": { "game": "megawalls", description: "Mega Walls stats for a player (or yourself)" },
+            "smash": { "game": "smashheroes", description: "Smash Heroes stats for a player (or yourself)" },
+            "warlords": { "game": "warlords", description: "Warlords stats for a player (or yourself)" },
+            "wl": { "game": "warlords", description: "Warlords stats for a player (or yourself)" },
+            "bb": { "game": "buildbattle", description: "Build Battle stats for a player (or yourself)" },
+            "gtb": { "game": "guessthebuild", description: "Guess the Build stats for a player (or yourself)" },
+            "suhc": { "game": "speeduhc", description: "Speed UHC stats for a player (or yourself)" },
+
+            "wool": { "game": "woolgames", description: "Wool Games stats for a player (or yourself)" },
+            "ww": { "game": "woolwars", description: "Wool Wars stats for a player (or yourself)" },
+            "sheep": { "game": "sheepwars", description: "Sheep Wars stats for a player (or yourself)" },
+            "ctw": { "game": "ctw", description: "Capture the Wool stats for a player (or yourself)" },
+
+            "tntrun": { "game": "tntrun", description: "TNT Run stats for a player (or yourself)" },
+            "tnttag": { "game": "tnttag", description: "TNT Tag stats for a player (or yourself)" },
+            "pvprun": { "game": "pvprun", description: "PvP Run stats for a player (or yourself)" },
+            "wizards": { "game": "tntwizards", description: "TNT Wizards stats for a player (or yourself)" },
+            "bowspleef": { "game": "bowspleef", description: "Bow Spleef stats for a player (or yourself)" },
+
+            "arcade": { "game": "arcade", description: "Arcade stats for a player (or yourself)" },
+            "blockingdead": { "game": "blockingdead", description: "Blocking Dead stats for a player (or yourself)" },
+            "bounty": { "game": "bountyhunters", description: "Bounty Hunters stats for a player (or yourself)" },
+            "creeperattack": { "game": "creeperattack", description: "Creeper Attack stats for a player (or yourself)" },
+            "disasters": { "game": "disasters", description: "Disasters stats for a player (or yourself)" },
+            "dragonwars": { "game": "dragonwars", description: "Dragon Wars stats for a player (or yourself)" },
+            "dropper": { "game": "dropper", description: "Dropper stats for a player (or yourself)" },
+            "enderspleef": { "game": "enderspleef", description: "Ender Spleef stats for a player (or yourself)" },
+            "farmhunt": { "game": "farmhunt", description: "Farm Hunt stats for a player (or yourself)" },
+            "football": { "game": "football", description: "Football stats for a player (or yourself)" },
+            "galaxywars": { "game": "galaxywars", description: "Galaxy Wars stats for a player (or yourself)" },
+            "hideandseek": { "game": "hideandseek", description: "Hide and Seek stats for a player (or yourself)" },
+            "hitw": { "game": "holeinthewall", description: "Hole in the Wall stats for a player (or yourself)" },
+            "hypixelsays": { "game": "hypixelsays", description: "Hypixel Says stats for a player (or yourself)" },
+            "miniwalls": { "game": "miniwalls", description: "Mini Walls stats for a player (or yourself)" },
+            "partygames": { "game": "partygames", description: "Party Games stats for a player (or yourself)" },
+            "pixelpainters": { "game": "pixelpainters", description: "Pixel Painters stats for a player (or yourself)" },
+            "pixelparty": { "game": "pixelparty", description: "Pixel Party stats for a player (or yourself)" },
+            "throwout": { "game": "throwout", description: "Throw Out stats for a player (or yourself)" },
+            "zombies": { "game": "zombies", description: "Zombies stats for a player (or yourself)" },
+
+            "eastersim": { "game": "eastersim", description: "Easter Simulator stats for a player (or yourself)" },
+            "grinchsim": { "game": "grinchsim", description: "Grinch Simulator stats for a player (or yourself)" },
+            "santasim": { "game": "santasim", description: "Santa Simulator stats for a player (or yourself)" },
+            "halloweensim": { "game": "halloweensim", description: "Halloween Simulator stats for a player (or yourself)" },
+            "scubasim": { "game": "scubasim", description: "Scuba Simulator stats for a player (or yourself)" },
+
+            "classic": { "game": "classic", description: "Classic Games stats for a player (or yourself)" },
+            "quake": { "game": "quake", description: "Quake stats for a player (or yourself)" },
+            "arena": { "game": "arena", description: "Arena Brawl stats for a player (or yourself)" },
+            "walls": { "game": "thewalls", description: "The Walls stats for a player (or yourself)" },
+            "vampirez": { "game": "vampirez", description: "VampireZ stats for a player (or yourself)" },
+            "vz": { "game": "vampirez", description: "VampireZ stats for a player (or yourself)" },
+            "tkr": { "game": "tkr", description: "Turbo Kart Racers stats for a player (or yourself)" },
+            "pb": { "game": "paintball", description: "Paintball stats for a player (or yourself)" },
+
+            "pit": { "game": "pit", description: "The Pit stats for a player (or yourself)" },
+        }
 
 const DEFAULT_CACHE_SECONDS = 300;
 
@@ -137,78 +206,6 @@ export const hypixelStatsPlugin: Plugin = {
         enabled: true,
         apiKey: "",
         cacheTtlSeconds: DEFAULT_CACHE_SECONDS,
-        // every game the plugin knows, keyed by command name. game is the
-        // GameMode whose tag tooltip gets rendered (names from util/tags.ts +
-        // core/game.ts), description shows up in command help. duels and fish
-        // are missing on purpose, they keep their hand written renderers
-        tooltipCommands: {
-            "hypixel": { "game": "general", description: "Network stats for a player (or yourself)" },
-            "bw": { "game": "bedwars", description: "Bedwars stats for a player (or yourself)" },
-            "sw": { "game": "skywars", description: "SkyWars stats for a player (or yourself)" },
-            "uhc": { "game": "uhc", description: "UHC stats for a player (or yourself)" },
-            "tnt": { "game": "tntgames", description: "TNT Games stats for a player (or yourself)" },
-            "mm": { "game": "murdermystery", description: "Murder Mystery stats for a player (or yourself)" },
-
-            "blitz": { "game": "blitz", description: "Blitz SG stats for a player (or yourself)" },
-            "sg": { "game": "blitz", description: "Blitz SG stats for a player (or yourself)" },
-            "cvc": { "game": "cvc", description: "Cops and Crims stats for a player (or yourself)" },
-            "mw": { "game": "megawalls", description: "Mega Walls stats for a player (or yourself)" },
-            "smash": { "game": "smashheroes", description: "Smash Heroes stats for a player (or yourself)" },
-            "warlords": { "game": "warlords", description: "Warlords stats for a player (or yourself)" },
-            "wl": { "game": "warlords", description: "Warlords stats for a player (or yourself)" },
-            "bb": { "game": "buildbattle", description: "Build Battle stats for a player (or yourself)" },
-            "gtb": { "game": "guessthebuild", description: "Guess the Build stats for a player (or yourself)" },
-            "suhc": { "game": "speeduhc", description: "Speed UHC stats for a player (or yourself)" },
-
-            "wool": { "game": "woolgames", description: "Wool Games stats for a player (or yourself)" },
-            "ww": { "game": "woolwars", description: "Wool Wars stats for a player (or yourself)" },
-            "sheep": { "game": "sheepwars", description: "Sheep Wars stats for a player (or yourself)" },
-            "ctw": { "game": "ctw", description: "Capture the Wool stats for a player (or yourself)" },
-
-            "tntrun": { "game": "tntrun", description: "TNT Run stats for a player (or yourself)" },
-            "tnttag": { "game": "tnttag", description: "TNT Tag stats for a player (or yourself)" },
-            "pvprun": { "game": "pvprun", description: "PvP Run stats for a player (or yourself)" },
-            "wizards": { "game": "tntwizards", description: "TNT Wizards stats for a player (or yourself)" },
-            "bowspleef": { "game": "bowspleef", description: "Bow Spleef stats for a player (or yourself)" },
-
-            "arcade": { "game": "arcade", description: "Arcade stats for a player (or yourself)" },
-            "blockingdead": { "game": "blockingdead", description: "Blocking Dead stats for a player (or yourself)" },
-            "bounty": { "game": "bountyhunters", description: "Bounty Hunters stats for a player (or yourself)" },
-            "creeperattack": { "game": "creeperattack", description: "Creeper Attack stats for a player (or yourself)" },
-            "disasters": { "game": "disasters", description: "Disasters stats for a player (or yourself)" },
-            "dragonwars": { "game": "dragonwars", description: "Dragon Wars stats for a player (or yourself)" },
-            "dropper": { "game": "dropper", description: "Dropper stats for a player (or yourself)" },
-            "enderspleef": { "game": "enderspleef", description: "Ender Spleef stats for a player (or yourself)" },
-            "farmhunt": { "game": "farmhunt", description: "Farm Hunt stats for a player (or yourself)" },
-            "football": { "game": "football", description: "Football stats for a player (or yourself)" },
-            "galaxywars": { "game": "galaxywars", description: "Galaxy Wars stats for a player (or yourself)" },
-            "hideandseek": { "game": "hideandseek", description: "Hide and Seek stats for a player (or yourself)" },
-            "hitw": { "game": "holeinthewall", description: "Hole in the Wall stats for a player (or yourself)" },
-            "hypixelsays": { "game": "hypixelsays", description: "Hypixel Says stats for a player (or yourself)" },
-            "miniwalls": { "game": "miniwalls", description: "Mini Walls stats for a player (or yourself)" },
-            "partygames": { "game": "partygames", description: "Party Games stats for a player (or yourself)" },
-            "pixelpainters": { "game": "pixelpainters", description: "Pixel Painters stats for a player (or yourself)" },
-            "pixelparty": { "game": "pixelparty", description: "Pixel Party stats for a player (or yourself)" },
-            "throwout": { "game": "throwout", description: "Throw Out stats for a player (or yourself)" },
-            "zombies": { "game": "zombies", description: "Zombies stats for a player (or yourself)" },
-
-            "eastersim": { "game": "eastersim", description: "Easter Simulator stats for a player (or yourself)" },
-            "grinchsim": { "game": "grinchsim", description: "Grinch Simulator stats for a player (or yourself)" },
-            "santasim": { "game": "santasim", description: "Santa Simulator stats for a player (or yourself)" },
-            "halloweensim": { "game": "halloweensim", description: "Halloween Simulator stats for a player (or yourself)" },
-            "scubasim": { "game": "scubasim", description: "Scuba Simulator stats for a player (or yourself)" },
-
-            "classic": { "game": "classic", description: "Classic Games stats for a player (or yourself)" },
-            "quake": { "game": "quake", description: "Quake stats for a player (or yourself)" },
-            "arena": { "game": "arena", description: "Arena Brawl stats for a player (or yourself)" },
-            "walls": { "game": "thewalls", description: "The Walls stats for a player (or yourself)" },
-            "vampirez": { "game": "vampirez", description: "VampireZ stats for a player (or yourself)" },
-            "vz": { "game": "vampirez", description: "VampireZ stats for a player (or yourself)" },
-            "tkr": { "game": "tkr", description: "Turbo Kart Racers stats for a player (or yourself)" },
-            "pb": { "game": "paintball", description: "Paintball stats for a player (or yourself)" },
-
-            "pit": { "game": "pit", description: "The Pit stats for a player (or yourself)" },
-        },
     },
 
     setup(api) {
@@ -366,7 +363,7 @@ export const hypixelStatsPlugin: Plugin = {
 
         // commands from map
         const RENDERED = new Set(["duels", "fish"]);
-        for (const [rawName, rawCommand] of Object.entries(config.tooltipCommands ?? {})) {
+        for (const [rawName, rawCommand] of Object.entries(autogen ?? {})) {
             if (!rawCommand || typeof rawCommand !== "object") {
                 api.log.warn(`tooltipCommands entry "${rawName}": needs { game, description }, skipping it`);
                 continue;
