@@ -168,8 +168,8 @@ export function gameFromTitle(title: string): GameMode {
     return "unknown";
 }
 
-// lobbies and games we dont know fall back to bedwars, thats what most of this
-// is built around and its what used to show everywhere
+// games we dont know fall back to Hypixel stats. the tracker tries to avoid
+// committing to unknown during short scoreboard gaps while a game is starting.
 export function statsGame(game: GameMode): GameMode {
     return game === "unknown" ? "general" : game;
 }
@@ -217,7 +217,7 @@ export class GameTracker {
     private awaiting = false;
     private timer?: NodeJS.Timeout;
 
-    private lastChange: number | null = null;
+    private unknownSince: number | null = null;
     private lastChangeDelay: number = 0.5 * 1000;
 
     get game(): GameMode {
@@ -277,13 +277,17 @@ export class GameTracker {
     private refresh(): boolean {
         const title = this.sidebar ? this.titles.get(this.sidebar) : undefined;
         const next = title ? gameFromTitle(title) : "unknown";
-        if (next === "unknown") { // avoid swapping to "unknown" because sidebar drops for a short time (turbo builders start)
+        if (next === "unknown") { // avoid swapping to "unknown" because the sidebar can disappear briefly while games start
             const currentTime = Date.now();
-            if (this.lastChange === null || currentTime - this.lastChange > this.lastChangeDelay) {
-                this.lastChange = currentTime;
-            } else {
-                return false;
+            if (this.current !== "unknown") {
+                if (this.unknownSince === null) {
+                    this.unknownSince = currentTime;
+                    return false;
+                }
+                if (currentTime - this.unknownSince < this.lastChangeDelay) return false;
             }
+        } else {
+            this.unknownSince = null;
         }
 
         if (next === this.current) return false;
@@ -295,6 +299,7 @@ export class GameTracker {
         this.titles.clear();
         this.sidebar = undefined;
         this.current = "unknown";
+        this.unknownSince = null;
         clearTimeout(this.timer);
         this.timer = undefined;
         this.awaiting = false;
