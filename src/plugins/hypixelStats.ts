@@ -245,7 +245,12 @@ export const hypixelStatsPlugin: Plugin = {
         api.registerEnricher({
             name: "hypixelStats",
             async enrich(player) {
-                if (player.uuid && isFakeUuid(player.uuid)) return tags.nickTags("via tab list uuid"); // fake uuid means fake npc or nicked player
+                if (player.uuid && isFakeUuid(player.uuid)) {
+                    // a fake uuid can be given to a real player *if* they're using a custom skin, ie. end lord in skywars
+                    const real = await resolveUuid(api.http, player.name);
+                    if (!real) return tags.nickTags("via tab list uuid"); // no account, nicked
+                    player = { ...player, uuid: real };
+                }
                 const result = await fetch(player);
                 if (result.status !== "ok") {
                     if (RETRYABLE.includes(result.status)) throw new Error(fetchErrorMessage(result.status));

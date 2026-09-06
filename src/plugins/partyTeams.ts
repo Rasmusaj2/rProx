@@ -148,7 +148,13 @@ export const partyTeamsPlugin: Plugin = {
                 if (uuid) state.uuids.set(key, uuid);
             }
 
-            if (uuid && isFakeUuid(uuid)) return { nick: true };
+            if (uuid && isFakeUuid(uuid)) {
+                // kit skins, doesnt happen in bedwars wher ethis is but idc
+                const real = await resolveUuid(api.http, name);
+                if (!real) return { nick: true };
+                uuid = real;
+                state.uuids.set(key, uuid);
+            }
             const result = await hypixel.fetchPlayer({ name, uuid });
             if (result.status === "no_data") return { nick: true };
             if (result.status !== "ok") {
