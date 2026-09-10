@@ -8,7 +8,7 @@ import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
 import { LobbyTracker, parseWhoResponse, type PlayerInfoPacket } from "../core/lobby";
 import { dashUuid } from "../services/microsoft";
-import { makeChatInjector, parseChat, PREFIX } from "../core/chat";
+import { makeChatInjector, parseChat, parsePlayerChat, PREFIX } from "../core/chat";
 import { createWindowApi } from "../interface/windowApi";
 import type { ChatMessage, Session } from "../core/types";
 
@@ -30,6 +30,7 @@ export class ProxyServer {
     private server: unknown;
     private sessionSeq = 0;
     private lastGameStart = new Map<string, number>();
+    private readonly bedwarsStarted = new Set<string>(); // sessions ingame
     private readonly accounts: AccountStore;
     private readonly links: LinkManager;
 
@@ -196,6 +197,7 @@ export class ProxyServer {
             ended = true;
             clog.info(`session ended (${who})${reason ? `: ${reason}` : ""}`);
             this.lastGameStart.delete(session.id);
+            this.bedwarsStarted.delete(session.id);
             windows.dispose();
             try {
                 client.end("Proxy connection closed");
@@ -223,7 +225,10 @@ export class ProxyServer {
                 if (meta.name === "chat") hideChat = this.onServerChat(data, session, clog);
                 else if (meta.name === "player_info") lobby.applyPlayerInfo(data as PlayerInfoPacket);
                 // forced to clear lobby on login because hypixel sends a player_info packet 
-                else if (meta.name === "login") lobby.clear();
+                else if (meta.name === "login") {
+                    lobby.clear();
+                    this.bedwarsStarted.delete(session.id); // in pregame cause server move
+                }
                 // windows before the event, so a plugin reading session.windows in
                 // a serverPacket handler is looking at the current state
                 windows.handleServerPacket(meta.name, data);
@@ -280,7 +285,18 @@ export class ProxyServer {
             return hide;
         }
 
+        // detect chat in pregame lobby
+        if (session.game === "bedwars" && !session.lobby && !this.bedwarsStarted.has(session.id)) {
+            const speaker = parsePlayerChat(chat.text);
+            const self = speaker !== null && speaker.toLowerCase() === session.username.toLowerCase();
+            if (speaker && !(this.config.detection.ignoreSelf && self)) {
+                const player = session.findPlayer(speaker) ?? { name: speaker };
+                if (!session.isNpc(player.name)) this.bus.emit("playerDetected", player, "CHAT", session); // just push it on the bus so other plugins can enrich on it
+            }
+        }
+
         if (!GAME_START_PATTERNS.some((pattern) => pattern.test(chat.text))) return hide;
+        if (GAME_START_PATTERNS[0].test(chat.text)) this.bedwarsStarted.add(session.id); // pregame is over
         const last = this.lastGameStart.get(session.id) ?? 0;
         if (Date.now() - last < GAME_START_COOLDOWN_MS) return hide;
         this.lastGameStart.set(session.id, Date.now());

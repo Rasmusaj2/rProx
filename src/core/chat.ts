@@ -54,6 +54,15 @@ export function parseChat(version: string, rawMessage: unknown, position: number
     return { text: stripColorCodes(formatted), formatted, raw, position };
 }
 
+
+const PLAYER_CHAT = /^(?:\[[^\]]*\]\s*)*([A-Za-z0-9_]{1,16})\s*:\s*.+$/;
+
+// pull the sender out of a chat line
+export function parsePlayerChat(text: string): string | null {
+    const match = PLAYER_CHAT.exec(text.trim());
+    return match ? match[1] : null;
+}
+
 // render a component down to a legacy §-string, so we can append to a tab list
 // display name without throwing away hypixels rank coloring
 export function componentToLegacy(version: string, raw: unknown): string {
