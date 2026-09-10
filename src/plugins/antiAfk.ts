@@ -11,6 +11,7 @@ interface AntiAfkConfig {
     autoStart?: boolean; // start on join, or wait for //afk
     lobbyOnly?: boolean;
     targetUser?: string | null; // use a targetUser instead of yourself for the DM, lets you avoid the "pling" on dm
+    dmCooldownMs?: number; // "you can only message every 0.5 seconds" fix
 }
 
 const DEFAULT_CHARSET = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -19,12 +20,19 @@ const DEFAULT_LENGTH = 16;
 const DEFAULT_PREFIX = "[AFK] ";
 // dming yourself faster than this is just asking hypixel for a chat mute
 const MIN_INTERVAL = 10;
+// hypixel drops a dm sent within roughly this long of another one
+const DEFAULT_DM_COOLDOWN = 750;
 // how many recent payloads stay hideable, a To and a From come back per message
 const KEEP_TOKENS = 4;
+// what counts as a dm command
+const DM_COMMAND = /^\/(?:msg|m|w|tell|r|reply|message|pm)\b/i;
 
 interface AfkState {
-    timer: NodeJS.Timeout;
+    timer?: NodeJS.Timeout;
+    retry?: NodeJS.Timeout; // a send pushed back to clear the dm cooldown
     tokens: string[];
+    lastSentAt: number; // when anti-afk last sent its own dm
+    lastChatAt: number; // when you last had a chat message go upstream
 }
 
 // finding the "to user" line
@@ -50,6 +58,7 @@ export const antiAfkPlugin: Plugin = {
         autoStart: true,
         lobbyOnly: true,
         targetUser: null,
+        dmCooldownMs: DEFAULT_DM_COOLDOWN,
     },
 
     setup(api) {
@@ -64,6 +73,7 @@ export const antiAfkPlugin: Plugin = {
         if (interval !== requested) {
             api.log.warn(`intervalSeconds ${requested} is too low, clamped to ${MIN_INTERVAL}s`);
         }
+        const cooldown = Math.max(0, Math.floor(config.dmCooldownMs ?? DEFAULT_DM_COOLDOWN));
 
         const sessions = new Map<string, AfkState>();
 
@@ -82,16 +92,28 @@ export const antiAfkPlugin: Plugin = {
         // who the dm goes to, yourself unless an alt is configured
         const targetOf = (session: Session) => config.targetUser || session.username;
 
-        const tick = (session: Session, tokens: string[]): void => {
+        const tick = (session: Session, state: AfkState): void => {
             if (config.lobbyOnly && !session.lobby) {
                 api.log.debug(`skipping anti-afk dm for ${session.username}, in a game`);
                 return;
             }
-            const token = (config.prefix ?? DEFAULT_PREFIX) + randomToken(tokens[tokens.length - 1]);
-            tokens.push(token);
-            if (tokens.length > KEEP_TOKENS) tokens.shift();
+            // dm sent too recently, wait for cooldown
+            const since = Date.now() - Math.max(state.lastSentAt, state.lastChatAt);
+            if (since < cooldown) {
+                if (!state.retry) {
+                    state.retry = setTimeout(() => {
+                        state.retry = undefined;
+                        tick(session, state);
+                    }, cooldown - since);
+                }
+                return;
+            }
+            const token = (config.prefix ?? DEFAULT_PREFIX) + randomToken(state.tokens[state.tokens.length - 1]);
+            state.tokens.push(token);
+            if (state.tokens.length > KEEP_TOKENS) state.tokens.shift();
             const target = targetOf(session);
             session.sendUpstream(`/msg ${target} ${token}`);
+            state.lastSentAt = Date.now();
             api.log.debug(`anti-afk dm for ${session.username}: ${token} (message sent to ${target})`);
         };
 
@@ -99,16 +121,17 @@ export const antiAfkPlugin: Plugin = {
 
         const start = (session: Session): void => {
             if (running(session)) return;
-            const tokens: string[] = [];
-            const timer = setInterval(() => tick(session, tokens), interval * 1000);
-            sessions.set(session.id, { timer, tokens });
+            const state: AfkState = { tokens: [], lastSentAt: 0, lastChatAt: 0 };
+            state.timer = setInterval(() => tick(session, state), interval * 1000);
+            sessions.set(session.id, state);
             api.log.info(`anti-afk on for ${session.username}, every ${interval}s`);
         };
 
         const stop = (sessionId: string): void => {
             const state = sessions.get(sessionId);
             if (!state) return;
-            clearInterval(state.timer);
+            if (state.timer) clearInterval(state.timer);
+            if (state.retry) clearTimeout(state.retry);
             sessions.delete(sessionId);
         };
 
@@ -116,6 +139,31 @@ export const antiAfkPlugin: Plugin = {
             if (config.autoStart) start(session);
         });
         api.on("sessionEnd", (session) => stop(session.id));
+
+        // remember whenever you send something, so a tick can yield to you
+        api.on("clientPacket", (name, data: any, session) => {
+            if (name !== "chat" || typeof data?.message !== "string") return;
+            const state = sessions.get(session.id);
+            if (state) state.lastChatAt = Date.now();
+        });
+
+        // antiafk just got sent, catch message right after
+        api.registerClientFilter((name, data: any, session) => {
+            if (cooldown === 0 || name !== "chat" || typeof data?.message !== "string") return;
+            if (!DM_COMMAND.test(data.message)) return;
+            const state = sessions.get(session.id);
+            if (!state) return;
+            const since = Date.now() - state.lastSentAt;
+            if (since >= cooldown) return;
+            const message = data.message;
+            const wait = cooldown - since;
+            api.log.debug(`holding your dm for ${wait}ms to clear the anti-afk cooldown`);
+            setTimeout(() => {
+                state.lastChatAt = Date.now();
+                session.sendUpstream(message);
+            }, wait);
+            return true;
+        });
 
         if (config.hideMessages) {
             api.registerChatFilter((msg, session) => {

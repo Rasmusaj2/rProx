@@ -50,7 +50,8 @@
             "messageLength": 16,
             "hideMessages": true,
             "autoStart": true,
-            "targetUser": null
+            "targetUser": null,
+            "dmCooldownMs": 750
         },
         "lobbyFishing": {
             "enabled": true,

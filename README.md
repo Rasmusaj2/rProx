@@ -162,7 +162,8 @@ Can be toggled with `//afk on` & `//afk off`
     "hideMessages": true, // if the messages should be hidden from you
     "autoStart": true, // if should be enabled on login, or you have to use //afk on
     "lobbyOnly": true, // only message while in a lobby, held back during games (needs nametagStats on)
-    "targetUser": null // what user to message. If null, will message yourself.
+    "targetUser": null, // what user to message. If null, will message yourself.
+    "dmCooldownMs": 750 // delay between messages enforced on hypixel, slightly longer than 500ms 
 }
 ```
 * **Urchin**
