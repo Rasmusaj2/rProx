@@ -221,10 +221,11 @@ export const hypixelStatsPlugin: Plugin = {
         let warnedInvalidKey = false;
 
         // the api only takes uuids, /who and chat detections only give us names
+        // fake uuid is from mythical kits, so resolve the proper uuid
         const withUuid = async (player: PlayerRef): Promise<PlayerRef> => {
-            if (player.uuid) return player;
+            if (player.uuid && !isFakeUuid(player.uuid)) return player;
             const uuid = await resolveUuid(api.http, player.name);
-            return uuid ? { ...player, uuid } : player;
+            return uuid ? { ...player, uuid } : { ...player, uuid: undefined };
         };
 
         // essential means somebody typed a command for this one, so it may spend the
