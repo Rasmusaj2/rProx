@@ -103,6 +103,7 @@ export const BOUNTYHUNTERS_WINS = countTiers(10, 50, 150, 400, 1000, 2500);
 export const BOUNTYHUNTERS_KDR = ratioTiers(0.75, 1.5, 2.5, 4, 6, 10);
 export const CREEPERATTACK_MAXWAVES = countTiers(5, 10, 15, 20, 25, 30);
 export const DISASTERS_WINS = countTiers(10, 50, 150, 400, 1000, 2500);
+export const DISASTERS_SURVIVED = countTiers(50, 250, 1000, 2500, 5000, 10000);
 export const DRAGONWARS_WINS = countTiers(10, 50, 150, 400, 1000, 2500);
 export const DRAGONWARS_KILLS = countTiers(500, 2500, 10000, 30000, 75000, 200000);
 export const DROPPERS_WINS = countTiers(10, 50, 150, 400, 1000, 2500);

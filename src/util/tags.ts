@@ -24,7 +24,7 @@ import {
     type HypixelPlayer,
     type RecentGame,
 } from "../services/hypixel";
-import { allWins, block, compact, inner, num, ownStat, stat, total, type Raw, type Stat } from "../services/games";
+import { allWins, block, compact, inner, num, ownStat, stat, sumValues, total, type Raw, type Stat } from "../services/games";
 import { bedwarsStar, woolStar } from "../services/prestige";
 import * as tiers from "../services/thresholds";
 import type { Thresholds } from "../services/thresholds";
@@ -414,6 +414,7 @@ export const generalTags = (player: HypixelPlayer, extras: GeneralExtras = {}): 
 interface Count {
     label: string; // tooltip label
     keys: string[];
+    sum?: string;
     tiers?: Thresholds; // needed on the two that become tags
     mark?: string; // letter worn after the number, e.g. "W" for wins
     big?: boolean; // shorten the long form too, for counters that run huge
@@ -441,7 +442,7 @@ interface GameSpec {
 }
 
 function read(raw: Raw, value: Value): number {
-    if ("keys" in value) return total(raw, ...value.keys);
+    if ("keys" in value) return value.sum ? sumValues(raw[value.sum]) : total(raw, ...value.keys);
     const over = total(raw, ...value.over);
     const under = total(raw, ...value.under);
     return ratio(over, value.less ? Math.max(0, under - over) : under);
@@ -481,6 +482,14 @@ const kdr = (tier: Thresholds, kills = "kills", deaths = "deaths"): Tagged => ({
 });
 
 const count = (label: string, key: string, big = false): Count => ({ label, keys: [key], big });
+const sum = (label: string, key: string, tiers: Thresholds, mark: string, big = false): Tagged => ({
+    label,
+    keys: [],
+    sum: key,
+    tiers,
+    mark,
+    big,
+});
 
 // keyed by the game the tags belong to, so nothing has to repeat it
 const SPECS = {
@@ -648,6 +657,7 @@ const SPECS = {
         block: "Arcade",
         path: ["disasters", "stats"], // nested twice for some reason
         head: wins(tiers.DISASTERS_WINS, "wins"),
+        trail: sum("Survived", "survived", tiers.DISASTERS_SURVIVED, "S", true),
         lines: [count("Games", "games_played"), count("Losses", "losses")],
     },
     dragonwars: {

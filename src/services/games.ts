@@ -30,6 +30,15 @@ export function total(raw: Raw, ...keys: string[]): number {
     return keys.reduce((sum, key) => sum + num(raw, ...key.split("|")), 0);
 }
 
+// sum disasters survived
+export function sumValues(raw: unknown): number {
+    if (!raw || typeof raw !== "object") return 0;
+    return Object.values(raw as Raw).reduce(
+        (sum, value) => sum + (typeof value === "number" && Number.isFinite(value) ? value : 0),
+        0,
+    );
+}
+
 
 export function allWins(raw: Raw): number {
     let total = 0;
