@@ -24,6 +24,13 @@ export interface Config {
     detection: {
         autoWhoOnStart: boolean, // true - automatically send /who on server join
         ignoreSelf: boolean, // false - ignore self in /who detection
+        npcDecoys: { // layered filters for the non-players hypixel pads the tab list with
+            minNameLength: number, // 3 - real mojang accounts are 3-16 chars
+            npcUuidVersions: string[], // ["2"] - uuid version nibble hypixel stamps on npcs
+            skipSpectators: boolean, // true - gamemode 3 tab rows are not players in the lobby
+            requireNameInDisplayName: boolean, // true - real players render as "[MVP+] Name"
+            skipZeroPingOnDump: boolean, // true - npcs and holograms sit at 0 ping in a dump
+        },
     }
     builtInPlugins: Record<string, unknown>, // custom config for builtInPlugins straight in config.json
     pluginDirectory: string, // ./plugins
@@ -49,6 +56,13 @@ const DEFAULTS: Config = {
     detection: {
         autoWhoOnStart: true,
         ignoreSelf: false,
+        npcDecoys: {
+            minNameLength: 3,
+            npcUuidVersions: ["2"],
+            skipSpectators: true,
+            requireNameInDisplayName: true,
+            skipZeroPingOnDump: true,
+        },
     },
     builtInPlugins: {},
     pluginDirectory: "./plugins",

@@ -156,7 +156,7 @@ export class ProxyServer {
             },
         });
 
-        const lobby = new LobbyTracker();
+        const lobby = new LobbyTracker(this.config.detection.npcDecoys);
         const toClient = (name: string, data: unknown) => {
             if (client.state === states.PLAY) client.write(name, data);
         };

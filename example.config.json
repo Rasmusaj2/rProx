@@ -16,7 +16,14 @@
     "commandPrefix": "//",
     "detection": {
         "autoWhoOnStart": true,
-        "ignoreSelf": false
+        "ignoreSelf": false,
+        "npcDecoys": {
+            "minNameLength": 3,
+            "npcUuidVersions": ["2"],
+            "skipSpectators": true,
+            "requireNameInDisplayName": true,
+            "skipZeroPingOnDump": true
+        }
     },
     "builtInPlugins": {
         "coreCommands": {

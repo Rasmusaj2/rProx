@@ -21,17 +21,44 @@ export interface TabEntry {
     name: string;
     uuid: string;
     displayName?: string; // raw component the server last sent
+    gamemode?: number;
+    ping?: number;
+}
+
+export interface PlayerInfoEntry {
+    uuid?: string;
+    UUID?: string;
+    name?: string;
+    displayName?: string;
+    gamemode?: number;
+    gameMode?: number;
+    ping?: number;
+    latency?: number;
 }
 
 export interface PlayerInfoPacket {
     action: string | number;
-    data?: Array<{
-        uuid?: string;
-        UUID?: string;
-        name?: string;
-        displayName?: string;
-    }>;
+    data?: PlayerInfoEntry[];
 }
+
+export interface NpcDecoyConfig {
+    minNameLength: number;
+    npcUuidVersions: string[];
+    skipSpectators: boolean;
+    requireNameInDisplayName: boolean;
+    skipZeroPingOnDump: boolean;
+}
+
+export const DEFAULT_NPC_DECOYS: NpcDecoyConfig = {
+    minNameLength: 3,
+    npcUuidVersions: ["2"],
+    skipSpectators: true,
+    requireNameInDisplayName: true,
+    skipZeroPingOnDump: true,
+};
+
+const INITIAL_DUMP_MS = 5_000;
+const JOIN_BATCH_MAX = 8;
 
 
 const NPC_RANK = /\[npc\]/i;
@@ -68,13 +95,21 @@ export class LobbyTracker {
     private byUuid = new Map<string, TabEntry>();
     private byName = new Map<string, string>(); // lowercase name -> uuid
     private npcs = new Set<string>(); // lowercase names wearing an [NPC] rank
+    private serverAt = Date.now(); // when the current servers login landed, see INITIAL_DUMP_MS
+    private readonly decoy: NpcDecoyConfig;
+
+    constructor(decoy: Partial<NpcDecoyConfig> = {}) {
+        this.decoy = { ...DEFAULT_NPC_DECOYS, ...decoy };
+    }
 
     // apply a decoded player_info packet, returns whoever is newly in the list
     applyPlayerInfo(packet: PlayerInfoPacket): PlayerRef[] {
         const action = actionName(packet.action);
         const added: PlayerRef[] = [];
+        const entries = packet.data ?? [];
+        const dump = entries.length > JOIN_BATCH_MAX || Date.now() - this.serverAt < INITIAL_DUMP_MS;
 
-        for (const entry of packet.data ?? []) {
+        for (const entry of entries) {
             const rawUuid = entry.uuid ?? entry.UUID;
             if (!rawUuid) continue;
             const uuid = dashUuid(rawUuid).toLowerCase();
@@ -82,9 +117,15 @@ export class LobbyTracker {
             if (action === "add_player") { // new player, new check, or a player rejoining after leaving
                 if (!entry.name) continue;
                 const existed = this.byUuid.has(uuid);
-                this.byUuid.set(uuid, { name: entry.name, uuid, displayName: entry.displayName });
+                this.byUuid.set(uuid, {
+                    name: entry.name,
+                    uuid,
+                    displayName: entry.displayName,
+                    gamemode: entry.gamemode ?? entry.gameMode,
+                    ping: entry.ping ?? entry.latency,
+                });
                 this.byName.set(entry.name.toLowerCase(), uuid);
-                if (hasNpcRank(entry.displayName)) this.markNpc(entry.name);
+                if (hasNpcRank(entry.displayName) || this.decoyReason(entry, uuid, dump)) this.markNpc(entry.name);
                 if (!existed) added.push({ name: entry.name, uuid });
             } else if (action === "remove_player") {
                 const known = this.byUuid.get(uuid);
@@ -97,9 +138,42 @@ export class LobbyTracker {
                 const known = this.byUuid.get(uuid);
                 if (known) known.displayName = entry.displayName;
                 if (known && hasNpcRank(entry.displayName)) this.markNpc(known.name);
+            } else if (action === "update_game_mode") {
+                const known = this.byUuid.get(uuid);
+                if (known) known.gamemode = entry.gamemode ?? entry.gameMode;
+            } else if (action === "update_latency") {
+                const known = this.byUuid.get(uuid);
+                if (known) known.ping = entry.ping ?? entry.latency;
             } // we dont care about anything else as it doesnt change the playerlist
         }
         return added;
+    }
+
+    // layed npc detection
+    private decoyReason(entry: PlayerInfoEntry, uuid: string, isDump: boolean): string | null {
+        const name = entry.name ?? "";
+
+        if (name.length < this.decoy.minNameLength) return `name shorter than ${this.decoy.minNameLength}`;
+
+        const version = uuid.replace(/-/g, "")[12];
+        if (this.decoy.npcUuidVersions.includes(version)) return `uuid version ${version}`;
+
+        const gamemode = entry.gamemode ?? entry.gameMode;
+        if (this.decoy.skipSpectators && gamemode === 3) return "spectator gamemode";
+
+        if (this.decoy.requireNameInDisplayName && entry.displayName !== null && entry.displayName !== undefined) {
+            const shown = stripColorCodes(componentText(entry.displayName));
+            if (shown.trim() && !shown.toLowerCase().includes(name.toLowerCase())) {
+                return "display name does not contain username";
+            }
+        }
+
+        if (this.decoy.skipZeroPingOnDump && isDump) {
+            const ping = entry.ping ?? entry.latency;
+            if (ping === 0) return "zero ping in lobby dump";
+        }
+
+        return null;
     }
 
     // npcs are left out, nothing downstream of this wants to spend a lookup on one
@@ -138,6 +212,7 @@ export class LobbyTracker {
         this.byUuid.clear();
         this.byName.clear();
         this.npcs.clear(); // a new server means a new set of npcs
+        this.serverAt = Date.now(); // the next player_info batch is this servers dump
     }
 }
 
