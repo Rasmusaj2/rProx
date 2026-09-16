@@ -1,4 +1,3 @@
-import type { GameMode } from "../core/game";
 import { isFakeUuid } from "../core/lobby";
 import type { Plugin, Session } from "../core/types";
 import { getHypixelService, bedwarsStats } from "../services/hypixel";
@@ -20,6 +19,10 @@ const SETTLE_POLL_MAX = 10;
 const SEND_DELAY_MS = 500;
 
 const GAME_START_PATTERN = "Protect your bed and destroy the enemy beds.";
+
+const NOT_IN_PARTY = /You are not in a party right now./;
+const CHAT_SEPARATOR = /^[-_=—–─]{10,}$/; // hypixels line wrapper
+const PARTY_REPLY_WINDOW_MS = 5_000; 
 
 // remembering s for gray cause green has g
 const TEAM_LETTERS: Record<string, { label: string; color: McColorName }> = {
@@ -45,6 +48,8 @@ interface SessionState {
     lastStart: number;
     uuids: Map<string, string>;
     timer?: NodeJS.Timeout;
+    announcement?: { aborted: boolean };
+    lastPartySendAt: number;
 }
 
 // steals hypixelStats apikey
@@ -80,7 +85,7 @@ export const partyTeamsPlugin: Plugin = {
         const stateFor = (session: Session): SessionState => {
             let state = sessions.get(session.id);
             if (!state) {
-                state = { teams: new Map(), lastStart: 0, uuids: new Map() };
+                state = { teams: new Map(), lastStart: 0, uuids: new Map(), lastPartySendAt: 0 };
                 sessions.set(session.id, state);
             }
             return state;
@@ -205,7 +210,12 @@ export const partyTeamsPlugin: Plugin = {
             );
 
             let sent = false;
+            state.announcement = { aborted: false };
             for (const [letter, players] of teams) {
+                if (state.announcement.aborted || sessions.get(session.id) !== state) {
+                    api.log.debug(`partyTeams announcement stopped early (not in a party?), ${sent} line(s) sent`);
+                    break;
+                }
                 const team = TEAM_LETTERS[letter];
                 const members = membersOf(players);
                 const stats = members.map((member) => statsByMember.get(member));
@@ -225,8 +235,10 @@ export const partyTeamsPlugin: Plugin = {
                     (nicks > 0 ? ` (${nicks} nick${nicks === 1 ? "" : "s"})` : "");
                 if (sent) await new Promise((resolve) => setTimeout(resolve, SEND_DELAY_MS));
                 session.sendUpstream(`/pc ${line}`);
+                state.lastPartySendAt = Date.now();
                 sent = true;
             }
+            state.announcement = undefined;
         };
 
         const onGameStart = (session: Session, state: SessionState): void => {
@@ -253,6 +265,24 @@ export const partyTeamsPlugin: Plugin = {
             };
             state.timer = setTimeout(tick, (config.delaySeconds ?? DEFAULT_DELAY_SECONDS) * 1000);
         };
+
+        // spamming /pc at start of game needs to get blocked if not in party (ie. solos)
+        api.registerChatFilter((msg, session) => {
+            if (!config.enabled) return;
+            const state = sessions.get(session.id);
+            if (!state) return;
+            if (Date.now() - state.lastPartySendAt > PARTY_REPLY_WINDOW_MS) return;
+
+            if (NOT_IN_PARTY.test(msg.text)) {
+                if (state.announcement) state.announcement.aborted = true;
+                api.log.debug(`partyTeams hid a not-in-a-party reply in ${session.username}'s session`);
+                return true;
+            }
+            if (CHAT_SEPARATOR.test(msg.text.trim())) {
+                api.log.debug(`partyTeams hid a separator line in ${session.username}'s session`);
+                return true;
+            }
+        });
 
         api.on("chat", (msg, session) => {
             if (!config.enabled) return;
