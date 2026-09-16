@@ -70,7 +70,7 @@ New settings are automatically filled into your config from new updates or plugi
 
 ### Core Plugin Configuration
 
-rProx comes with 7 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing & a daily reward handler
+rProx comes with 7 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing, partyTeams & a daily reward handler
 
 Configuration for these are set in [`config.json`](config.json) section called `builtInPlugins` - This section also works for configuration for external plugins, but the tooling for this is uncomplete.
 
@@ -194,6 +194,19 @@ Players can be looked up with `//urchin`
                 "scoreThreshold": 0 // when to show a SNIPER tag based on seraphs sniper score
             }
         }
+```
+* **partyTeams**
+
+Posts combined team stars & FKDR to party chat when a Bedwars game starts, so your entire team does not need
+
+Lines look like `[RED] (US) - ✫60 - 4.25 FKDR (1 nick)`, showing (US) when its your own team
+
+```json
+"partyTeams": {
+    "enabled": true,
+    "apiKey": "", // empty falls back to builtInPlugins.hypixelStats.apiKey
+    "delaySeconds": 1 // wait after the start line before announcing, lets teams actually settle
+}
 ```
 
 ### Extendable plugins
