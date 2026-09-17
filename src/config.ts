@@ -12,6 +12,7 @@ export interface Config {
         targetPort: number, // 25565
         version: string, // 1.8.9
         motd: string, // Proxy | Aesthetic
+        icon: string, // "" - path to a png (relative to the exe/cwd) or a base64 string (data:image/png;base64,...) - if empty, no icon is sent
         onlineMode: boolean, // true recommended - if false should only be run locally
         allowIngameEditing: boolean, // true - allows editing config.json in a chest gui while in-game
         maxPlayers: number // 10
@@ -44,6 +45,7 @@ const DEFAULTS: Config = {
         targetPort: 25565,
         version: "1.8.9",
         motd: "§brProx §2| §6Hypixel Stats Proxy.",
+        icon: "",
         onlineMode: true,
         allowIngameEditing: true,
         maxPlayers: 10

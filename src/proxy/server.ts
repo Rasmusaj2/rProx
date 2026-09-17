@@ -1,5 +1,8 @@
+import { readFileSync, existsSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import mc from "minecraft-protocol";
 import { createLogger, type Logger } from "../util/log";
+import { fromBase } from "../util/paths";
 import { AccountStore } from "./accounts";
 import { LinkManager, AUTH_OPTIONS } from "./linking";
 import type { Config } from "../config";
@@ -15,6 +18,24 @@ import type { ChatMessage, Session } from "../core/types";
 const log = createLogger("proxy");
 
 const states = mc.states;
+
+// minecraft-protocol wants the server list icon as a data uri, we either allow path or base64 and convert it
+function resolveFavicon(icon: string): string | undefined {
+    const value = icon.trim();
+    if (!value) return undefined;
+    if (value.startsWith("data:")) return value;
+    const path = isAbsolute(value) ? value : fromBase(value);
+    if (!existsSync(path)) {
+        log.warn(`proxy icon not found, ignoring: ${path}`);
+        return undefined;
+    }
+    try {
+        return `data:image/png;base64,${readFileSync(path).toString("base64")}`;
+    } catch (error) {
+        log.warn(`could not read proxy icon ${path}: ${error}`);
+        return undefined;
+    }
+}
 
 // game start lines
 const GAME_START_PATTERNS = [
@@ -60,6 +81,7 @@ export class ProxyServer {
             port: proxy.listenPort,
             version: proxy.version,
             motd: proxy.motd,
+            favicon: resolveFavicon(proxy.icon),
             maxPlayers: proxy.maxPlayers,
         });
 

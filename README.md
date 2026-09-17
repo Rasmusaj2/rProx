@@ -25,6 +25,23 @@ After the config is edited, reopen rProx, connect to `127.0.0.1:25565` on Minecr
 
 New settings are automatically filled into your config from new updates or plugins.
 
+## Proxy Configuration
+The `proxy` block controls the server rProx presents to your client:
+```json
+"proxy": {
+    "listenHost": "127.0.0.1",
+    "listenPort": 25565,
+    "targetHost": "mc.hypixel.net",
+    "targetPort": 25565,
+    "version": "1.8.9",
+    "motd": "§brProx §2| §6Hypixel Stats Proxy.",
+    "icon": "", // server list icon: path to a .png, or a data:image/png;base64
+    "onlineMode": true,
+    "maxPlayers": 10
+}
+```
+`icon` accepts either a path to a 64x64 `.png` (relative to the folder you run rProx from) or a ready-made `data:image/png;base64,...` string.
+
 ## Default Commands
 () -  Required  arguments
 [] - Optional Arguments

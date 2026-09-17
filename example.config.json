@@ -6,6 +6,7 @@
         "targetPort": 25565,
         "version": "1.8.9",
         "motd": "§brProx §2| §6Hypixel Stats Proxy.",
+        "icon": "",
         "onlineMode": true,
         "maxPlayers": 10
     },
