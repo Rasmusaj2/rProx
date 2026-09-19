@@ -266,12 +266,13 @@ export function networkLevel(networkExp: number): number {
 }
 
 // bedwars stats
-// the four core queues, prefix of every per mode key (ie. eight_one_wins_bedwars)
+// the core queues, prefix of every per mode key (ie. eight_one_wins_bedwars)
 const BEDWARS_MODES: ReadonlyArray<readonly [prefix: string, name: string]> = [
     ["eight_one", "Solo"],
     ["eight_two", "Doubles"],
     ["four_three", "3v3v3v3"],
-    ["four_four", "4v4"],
+    ["four_four", "4v4v4v4"],
+    ["two_four", "4v4"],
 ];
 
 export interface BedwarsModeStats {
