@@ -54,6 +54,8 @@ The `proxy` block controls the server rProx presents to your client:
 
 `//sw [user]` - Shows a players SkyWars statistics
 
+`//arcade [user]` - Shows a players Arcade statistics, with a breakdown of every mode
+
 `//mm [user]` - Shows a players Murder Mystery statistics
 
 `//fish [user]` - Shows a players Lobby Fishing statistics

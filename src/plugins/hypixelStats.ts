@@ -90,7 +90,6 @@ const autogen = {
             "wizards": { "game": "tntwizards", description: "TNT Wizards stats for a player (or yourself)" },
             "bowspleef": { "game": "bowspleef", description: "Bow Spleef stats for a player (or yourself)" },
 
-            "arcade": { "game": "arcade", description: "Arcade stats for a player (or yourself)" },
             "blockingdead": { "game": "blockingdead", description: "Blocking Dead stats for a player (or yourself)" },
             "bounty": { "game": "bountyhunters", description: "Bounty Hunters stats for a player (or yourself)" },
             "creeperattack": { "game": "creeperattack", description: "Creeper Attack stats for a player (or yourself)" },
@@ -278,6 +277,10 @@ export const hypixelStatsPlugin: Plugin = {
             return { title: formatRankedName(result.player, target.name), player: result.player };
         };
 
+        // a tag tooltip minus the "via Hypixel API" footer, ready to splat into chat
+        const tooltipLines = (tooltip: string): string[] =>
+            tooltip.split("\n").filter((line) => !line.startsWith("§8via"));
+
         // gexp + recent games, two extra endpoints the enricher never touches
         const generalExtras = async (player: HypixelPlayer) => {
             const dashed = player.uuid ? dashUuid(player.uuid) : undefined;
@@ -367,6 +370,28 @@ export const hypixelStatsPlugin: Plugin = {
             "Lobby Fishing stats for a player (or yourself)",
         );
 
+        // the arcade hub plus a line for every mode behind it, like //duels
+        api.registerCommand(
+            "arcade",
+            async (args, session) => {
+                const found = await resolve(args, session);
+                if (!found) return;
+                const all = tags.allTags(found.player);
+                const hub = all.find((t) => t.game === "arcade");
+                const summary = hub?.tooltip ? tooltipLines(hub.tooltip) : [];
+                const modes = tags.arcadeModes(found.player);
+
+                session.chat.text(`${PREFIX} ${found.title} §7- §bArcade`);
+                if (summary.length === 0 && modes.length === 0) {
+                    session.chat.text(`  §7No Arcade stats`);
+                    return;
+                }
+                for (const line of summary) session.chat.text(`  ${line}`);
+                for (const line of modes) session.chat.text(`  ${line}`);
+            },
+            "Arcade stats for every mode (or yourself)",
+        );
+
         // commands from map
         const RENDERED = new Set(["duels", "fish"]);
         for (const [rawName, rawCommand] of Object.entries(autogen ?? {})) {
@@ -408,7 +433,7 @@ export const hypixelStatsPlugin: Plugin = {
                         session.chat.text(`  §7No ${game} stats`);
                         return;
                     }
-                    const lines = tag.tooltip.split("\n").filter((line) => !line.startsWith("§8via"));
+                    const lines = tooltipLines(tag.tooltip);
                     session.chat.text(`${PREFIX} ${found.title} §7- ${lines[0]}`);
                     for (const line of lines.slice(1)) session.chat.text(`  ${line}`);
                 },

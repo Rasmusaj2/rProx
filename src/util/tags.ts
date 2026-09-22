@@ -451,6 +451,17 @@ function read(raw: Raw, value: Value): number {
 const asStat = (raw: Raw, value: Tagged): Stat =>
     stat(read(raw, value), value.tiers, "keys" in value ? { label: value.mark, short: value.big } : {});
 
+// the cells drawn under a spec's head line, shared with the //arcade breakdown
+function specCells(raw: Raw, spec: GameSpec, trail?: Stat): string[] {
+    return [
+        ...(spec.trail && trail ? [`§7${spec.trail.label}: ${trail.formatted}`] : []),
+        ...(spec.lines ?? []).map((value) => {
+            const number = read(raw, value);
+            return `§7${value.label}: ${w("keys" in value && value.big ? compact(number) : number)}`;
+        }),
+    ];
+}
+
 // auto-generates the tooltip and prefix/suffix tags for a game, given the spec defined in SPECS
 function specTags(player: HypixelPlayer, game: GameMode, spec: GameSpec): Tag[] {
     const raw = spec.path ? inner(block(player, spec.block), ...spec.path) : block(player, spec.block);
@@ -460,13 +471,7 @@ function specTags(player: HypixelPlayer, game: GameMode, spec: GameSpec): Tag[] 
 
     const head = asStat(raw, spec.head);
     const trail = spec.trail ? asStat(raw, spec.trail) : undefined;
-    const cells = [
-        ...(spec.trail && trail ? [`§7${spec.trail.label}: ${trail.formatted}`] : []),
-        ...(spec.lines ?? []).map((value) => {
-            const number = read(raw, value);
-            return `§7${value.label}: ${w("keys" in value && value.big ? compact(number) : number)}`;
-        }),
-    ];
+    const cells = specCells(raw, spec, trail);
     const rows: string[] = [];
     for (let i = 0; i < cells.length; i += 3) rows.push(cells.slice(i, i + 3).join("   "));
     return gameTags(game, [`§7${spec.title} ${head.formatted}`, ...rows], head, trail);
@@ -966,6 +971,25 @@ const SPECS = {
         lines: [count("Kills", "kills"), count("Deaths", "deaths"), count("Coins", "coins", true)],
     },
 } satisfies Partial<Record<GameMode, GameSpec>>;
+
+// every spec that lives in the arcade block, in declaration order. the //arcade
+// breakdown walks this, so a new arcade spec shows up with no extra wiring
+const ARCADE = (Object.entries(SPECS) as Array<[GameMode, GameSpec]>).filter(([, spec]) => spec.block === "Arcade");
+
+// one compact line per arcade mode (head + trailing counters) for //arcade
+export function arcadeModes(player: HypixelPlayer): string[] {
+    const lines: string[] = [];
+    for (const [, spec] of ARCADE) {
+        const raw = spec.path ? inner(block(player, spec.block), ...spec.path) : block(player, spec.block);
+        const head = read(raw, spec.head);
+        const trail = spec.trail ? read(raw, spec.trail) : 0;
+        if (head === 0 && trail === 0) continue; // never played this one
+        const cells = [`§7${spec.head.label}: ${asStat(raw, spec.head).formatted}`];
+        cells.push(...specCells(raw, spec, spec.trail ? asStat(raw, spec.trail) : undefined));
+        lines.push(`§b${spec.title}§8: ${cells.join("   ")}`);
+    }
+    return lines;
+}
 
 // the games written by hand further up, the rest come out of SPECS
 const BY_HAND = [
