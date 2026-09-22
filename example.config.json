@@ -91,6 +91,11 @@
                 "safeHeat": 40
             }
         },
+        "duelsStats": {
+            "enabled": true,
+            "apiKey": "",
+            "delaySeconds": 1
+        },
         "example": {
             "enabled": true,
             "reply": "pong"

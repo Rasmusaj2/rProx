@@ -944,6 +944,42 @@ export function findDuelsTarget(query: string): DuelsTarget | undefined {
     return nearMode ? { kind: "mode", mode: nearMode } : undefined;
 }
 
+// pull a duels mode out of arbitrary scoreboard text (a sidebar title or row,
+// ie. "SkyWars Duels" or just "Bridge"). only exact names and aliases count, so
+// short words like "the" cannot prefix-match their way into "The Walls".
+export function duelsTargetFromText(text: string): DuelsTarget | undefined {
+    const clean = stripColorCodes(text)
+        .toLowerCase()
+        .replace(/\bduels?\b/g, " ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    if (!clean) return undefined;
+
+    const categories = new Map<string, string>();
+    for (const [name, aliases] of Object.entries(DUELS_CATEGORY_ALIASES)) {
+        categories.set(name.toLowerCase().replace(/[^a-z0-9]/g, ""), name);
+        for (const alias of aliases) categories.set(alias, name);
+    }
+    const modes = new Map<string, DuelsMode>();
+    for (const mode of DUELS_MODES) {
+        modes.set(mode.key.replace(/_/g, ""), mode);
+        for (const alias of mode.aliases) modes.set(alias, mode);
+    }
+
+    const words = clean.split(" ").filter(Boolean);
+    // longest run first, so "bed wars" beats "wars" (nothing) and "mega walls" beats "walls"
+    for (let size = Math.min(3, words.length); size >= 1; size--) {
+        for (let i = 0; i + size <= words.length; i++) {
+            const candidate = words.slice(i, i + size).join("");
+            const category = categories.get(candidate);
+            if (category) return { kind: "category", category };
+            const mode = modes.get(candidate);
+            if (mode) return { kind: "mode", mode };
+        }
+    }
+    return undefined;
+}
+
 export function duelsCategoryStats(stats: DuelsStats, category: string): DuelsCategory {
     const all = DUELS_MODES.filter((mode) => mode.category === category).map((mode) => stats.modes[mode.key]);
     return { name: category, modes: all.filter((m) => m.played), combined: combineDuelsModes(category, all) };
