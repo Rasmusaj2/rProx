@@ -145,9 +145,12 @@ export const duelsStatsPlugin: Plugin = {
             state.pendingRank = state.pendingRank.filter((join) => now - join.at < RANK_WAIT_MS);
         };
 
+        const inDuelsQueue = (session: Session, state: SessionState): boolean =>
+            session.game === "duels" || isDuelsTitle(state.sidebar.title);
 
         const postRanks = (session: Session, state: SessionState): void => {
             if (sessions.get(session.id) !== state) return;
+            if (!inDuelsQueue(session, state)) return;
             if (state.started) return;
             const counts = new Map<string, number>(); // colour to players
             for (const [uuid, rank] of state.rankByUuid) {
