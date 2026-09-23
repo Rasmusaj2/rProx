@@ -94,7 +94,8 @@
         "duelsStats": {
             "enabled": true,
             "apiKey": "",
-            "delaySeconds": 1
+            "delaySeconds": 1,
+            "includeSelf": true
         },
         "example": {
             "enabled": true,
