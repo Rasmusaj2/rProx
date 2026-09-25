@@ -67,8 +67,8 @@ export class EnrichmentEngine {
     }
 
     // run every enricher for one player and merge what they hand back
-    async collectDetailed(player: PlayerRef, source: DetectSource): Promise<Collected> {
-        const ctx = { http: this.http, log, config: this.config, source };
+    async collectDetailed(player: PlayerRef, source: DetectSource, session?: Session): Promise<Collected> {
+        const ctx = { http: this.http, log, config: this.config, source, session };
         let failed = false;
         const perEnricher = await Promise.all(
             this.enrichers.map(async (enricher) => {
@@ -84,8 +84,8 @@ export class EnrichmentEngine {
         return { tags: perEnricher.flat(), failed };
     }
 
-    async collect(player: PlayerRef, source: DetectSource): Promise<Tag[]> {
-        return (await this.collectDetailed(player, source)).tags;
+    async collect(player: PlayerRef, source: DetectSource, session?: Session): Promise<Tag[]> {
+        return (await this.collectDetailed(player, source, session)).tags;
     }
 
     // check one player and put a line in chat if theres anything worth showing
@@ -104,7 +104,7 @@ export class EnrichmentEngine {
 
         // collect() hands back every game the enrichers know about, the chat
         // line only wants the one being played
-        const tags = tagsForGame(await this.collect(player, source), session.game);
+        const tags = tagsForGame(await this.collect(player, source, session), session.game);
         if (tags.length === 0 && !options.always) return;
         session.chat.raw(renderPlayerLine(player.name, tags));
     }

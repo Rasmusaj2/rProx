@@ -71,6 +71,7 @@ interface UrchinConfig {
     ignoreTypes?: string[];
     types?: Record<string, StyleConfig>;
     alerts?: AlertConfig;
+    disableInLobby?: boolean; // skip background lookups and alerts while in a lobby to save ratelimit
     seraph?: SeraphConfig;
 }
 
@@ -174,6 +175,7 @@ export const urchinPlugin: Plugin = {
         timeoutMs: 6000,
         ignoreTypes: [], 
         types: {}, 
+        disableInLobby: false,
         alerts: {
             enabled: true,
             onJoin: true, 
@@ -563,8 +565,9 @@ export const urchinPlugin: Plugin = {
 
         api.registerEnricher({
             name: "urchin",
-            async enrich(player) {
+            async enrich(player, ctx) {
                 if (!anyLive()) return null;
+                if (config.disableInLobby && ctx.session?.lobby) return null; // hold off, save the ratelimit for games
                 return (await hitsFor(player)).map(
                     (hit): Tag => ({
                         text: hit.label,
@@ -619,6 +622,7 @@ export const urchinPlugin: Plugin = {
 
         async function alertFor(session: Session, player: PlayerRef, verb: string): Promise<void> {
             if (!alerts.enabled || !anyLive()) return;
+            if (config.disableInLobby && session.lobby) return; // hold off, save the ratelimit for games
             if (!player?.name || session.isNpc(player.name)) return;
             if (player.name.toLowerCase() === session.username.toLowerCase()) return;
 
@@ -755,7 +759,9 @@ export const urchinPlugin: Plugin = {
         );
 
         const live = [urchin, seraph].filter((source) => !source.disabled).map((source) => source.name);
-        api.log.info(`blacklist tags active via ${live.join(" + ")} (alerts: ${alerts.enabled ? "on" : "off"}, cache ${ttl / 1000}s)`);
+        api.log.info(
+            `blacklist tags active via ${live.join(" + ")} (alerts: ${alerts.enabled ? "on" : "off"}, lobbies: ${config.disableInLobby ? "off" : "on"}, cache ${ttl / 1000}s)`,
+        );
     },
 };
 

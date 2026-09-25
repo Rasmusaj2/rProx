@@ -13,6 +13,7 @@ interface NametagConfig {
     cacheTtlSeconds?: number;
     maxTablistPlayers?: number; // limit amounts to lookup to avoid wasting ratelimit on big hubs, default 32
     lookupConcurrency?: number; // concurrency, default 4
+    disableInLobby?: boolean; // skip lookups while in a lobby to save ratelimit for actual games
 }
 
 interface TeamInfo {
@@ -186,6 +187,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
             cacheTtlSeconds: DEFAULT_CACHE_SECONDS,
             maxTablistPlayers: DEFAULT_MAX_TABLIST,
             lookupConcurrency: DEFAULT_CONCURRENCY,
+            disableInLobby: false,
         },
 
         setup(api) {
@@ -278,16 +280,24 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 const label = `server ${where.server}, ${where.lobby ? "lobby" : "game"}`;
                 if (where.changed) api.log.info(`on ${label}`);
                 else api.log.debug(`on ${label}`);
+                // leaving a lobby for a game opens the lookup gate again, so
+                // re-queue whatever turned up while we were holding off
+                if (where.changed && config.disableInLobby) requeueAll(session, state);
                 return where.ours;
             });
+
+            // put every name we are tracking back through the lookup queue
+            function requeueAll(session: Session, state: SessionState): void {
+                for (const uuid of state.tab.keys()) queueTab(session, state, uuid);
+                for (const teamName of state.teams.keys()) queueTeam(session, state, teamName);
+            }
 
             // a different game means a different set of stats on every name, so redo everything when the game changes
             function onGameChange(session: Session): void {
                 const state = stateFor(session.id);
                 session.game = state.games.game;
                 api.log.info(`game is now ${session.game}`);
-                for (const uuid of state.tab.keys()) queueTab(session, state, uuid);
-                for (const teamName of state.teams.keys()) queueTeam(session, state, teamName);
+                requeueAll(session, state);
             }
 
             // an npc stays an npc for as long as this server keeps it around, so
@@ -320,7 +330,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
             // a players tags, cached per name for this session. the entry is stored
             // before the lookup resolves so whoever asks next waits on the same
             // call, and a lookup that failed only holds the slot for a moment
-            function tagsFor(state: SessionState, player: PlayerRef): Promise<Collected> {
+            function tagsFor(state: SessionState, player: PlayerRef, session: Session): Promise<Collected> {
                 const key = player.name.toLowerCase();
                 const hit = state.tagCache.get(key);
                 if (hit && hit.expires > Date.now()) return hit.lookup;
@@ -332,7 +342,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     else state.failures.delete(key);
                     return result;
                 };
-                entry.lookup = enrichment.collectDetailed(player, "GAME").then(settle, (error) => {
+                entry.lookup = enrichment.collectDetailed(player, "GAME", session).then(settle, (error) => {
                     api.log.debug(`lookup for ${player.name} failed: ${error}`);
                     return settle({ tags: [], failed: true });
                 });
@@ -478,6 +488,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
 
             function queueTab(session: Session, state: SessionState, uuid: string): void {
                 if (!config.tablist) return;
+                if (config.disableInLobby && session.lobby) return; // hold off, save the ratelimit for games
                 const entry = state.tab.get(uuid);
                 // skip invalid entries, npcs, and hypixels fake "Tokens: ..." style
                 // tab rows, none of which should cost a lookup
@@ -491,7 +502,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     // the team carrying the [NPC] mark can land while we sat in the queue
                     if (session.isNpc(before.name)) return;
                     if (!affordLookup(state, before.name)) return;
-                    const { tags, failed } = await tagsFor(state, { name: before.name, uuid });
+                    const { tags, failed } = await tagsFor(state, { name: before.name, uuid }, session);
 
                     const current = state.tab.get(uuid);
                     if (!current) return;
@@ -659,6 +670,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
 
             function queueTeam(session: Session, state: SessionState, teamName: string): void {
                 if (!config.aboveHead) return;
+                if (config.disableInLobby && session.lobby) return; // hold off, save the ratelimit for games
                 const team = state.teams.get(teamName);
                 if (!team?.complete) return;
                 if (hasNpcRank(team.serverPrefix) || hasNpcRank(team.serverSuffix)) return;
@@ -684,7 +696,7 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                     // whichever decoration ends up consuming it
                     if (!affordLookup(state, player.name)) return;
 
-                    const { tags, failed } = await tagsFor(state, player);
+                    const { tags, failed } = await tagsFor(state, player, session);
 
                     // re-check after awaiting, membership may have moved underneath us
                     const current = state.teams.get(teamName);
@@ -729,7 +741,9 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 });
             }
 
-            api.log.info(`name decoration active (above-head: ${config.aboveHead}, tablist: ${config.tablist})`);
+            api.log.info(
+                `name decoration active (above-head: ${config.aboveHead}, tablist: ${config.tablist}, lobbies: ${config.disableInLobby ? "off" : "on"})`,
+            );
         },
     };
 }

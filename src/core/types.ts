@@ -37,6 +37,7 @@ export interface EnrichContext {
     log: Logger;
     config: Config;
     source: DetectSource;
+    session?: Session; // the session this lookup belongs to, left off for lookups with no session behind them
 }
 
 // the main extension point - turns a player into tags

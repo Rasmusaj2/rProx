@@ -115,7 +115,8 @@ Shows player statistics in the tab menu or above their playerhead in lobbies & g
     "tablist": true, // show stats in the tablist
     "maxTablistPlayers": 32, // player list size above which we stop looking anyone new up, tablist and above-head alike. raise it to cover big hubs, at the cost of the API ratelimit
     "cacheTtlSeconds": 120,
-    "lookupConcurrency": 4 // how many lookups are allowed to be in flight at once
+    "lookupConcurrency": 4, // how many lookups are allowed to be in flight at once
+    "disableInLobby": false // skip lookups while in a lobby, saving the ratelimit for actual games
 } // NOTE: API Key here leeches from hypixelStats
 ```
 * **dailyRewards**
@@ -199,6 +200,7 @@ Players can be looked up with `//urchin`
             "ignoreTypes": [], // tags to ignore
             "timeoutMs": 6000,
             "types": {},
+            "disableInLobby": false, // skip background lookups and alerts while in a lobby to save ratelimit (needs nametagStats on to know when you are in one)
             "alerts": {
                 "enabled": true, // if chat messages should be sent
                 "onJoin": true, // when a new player joins a lobby

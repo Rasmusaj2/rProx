@@ -41,7 +41,8 @@
             "tablist": true,
             "cacheTtlSeconds": 120,
             "maxTablistPlayers": 32,
-            "lookupConcurrency": 4
+            "lookupConcurrency": 4,
+            "disableInLobby": false
         },
         "dailyRewards": {
             "enabled": true,
