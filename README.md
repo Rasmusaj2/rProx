@@ -265,7 +265,7 @@ Higher level helpers like the sidebar api are handed out by the proxy under the
 name `rprox`, so a plugin never has to know where they sit on disk:
 
 ```js
-const { createSidebarApi, colors } = require("rprox"); // or "rprox/sidebar", "rprox/colors" if you wish to import only certain functionality.
+const { createBossBarApi, createSidebarApi, colors } = require("rprox"); // or "rprox/bossbar", "rprox/sidebar", "rprox/colors" if you wish to import only certain functionality.
 ```
 
 Do not require them by path. `require("../src/interface/sidebarApi")` only works when running from source, not as a packaged `.exe` 

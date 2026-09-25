@@ -1,12 +1,16 @@
 import Module from "node:module";
+import * as bossbar from "../interface/bossbarApi";
 import * as sidebar from "../interface/sidebarApi";
+import * as title from "../interface/titleApi";
 import * as windows from "../interface/windowApi";
 import * as colors from "../util/mcColors";
 
 // let external plugins import the same instance of the apis available to the proxy itself, so they can use the same types and functions
+
 // for ie. sidebar construction or bossbar modification, without having to import from a path, since that isnt possible while compiled to an executable.
 // this is a bit hacky but it works, and is the only way to get a plugin to use the same instance of the apis as the proxy itself, so they can share state and types
 const api = {
+    ...bossbar,
     ...sidebar,
     ...windows,
     colors,
@@ -14,17 +18,22 @@ const api = {
 
 export type RProxPluginHost = typeof api;
 
+
 // every name a plugin may ask for, pointing at the one instance we already have
 // needs to be updated when implementing new interfaces, so they can be imported by plugins without having to import from a path
 // furthermore, update plugins/rprox.d.ts to declare the new module for type checking and linting, so plugins can import it without having to import from a path
 const registry = new Map<string, unknown>([
     ["rprox", api],
+    ["rprox/bossbar", bossbar],
     ["rprox/sidebar", sidebar],
     ["rprox/window", windows],
+    ["rprox/title", title],
     ["rprox/colors", colors],
     // what a plugin written against the checked out repo would have asked for
+    ["interface/bossbarApi", bossbar],
     ["interface/sidebarApi", sidebar],
     ["interface/windowApi", windows],
+    ["interface/titleApi", title],
     ["util/mcColors", colors],
 ]);
 

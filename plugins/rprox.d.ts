@@ -7,11 +7,17 @@
 // (ie. when bossbarApi.ts is added, declare it in rprox, and declare its own module for direct imports in plugins)
 
 declare module "rprox" {
+    export * from "../src/interface/bossbarApi";
     export * from "../src/interface/sidebarApi";
     export * from "../src/interface/windowApi";
+    export * from "../src/interface/titleApi";
     export * as colors from "../src/util/mcColors";
     export type { EnrichmentEngine, Collected } from "../src/core/enrichment";
     export type { Plugin, PluginApi, Tag, PlayerRef, Session, ChatMessage, DetectSource } from "../src/core/types";
+}
+
+declare module "rprox/bossbar" {
+    export * from "../src/interface/bossbarApi";
 }
 
 declare module "rprox/sidebar" {
@@ -20,6 +26,10 @@ declare module "rprox/sidebar" {
 
 declare module "rprox/window" {
     export * from "../src/interface/windowApi";
+}
+
+declare module "rprox/title" {
+    export * from "../src/interface/titleApi";
 }
 
 declare module "rprox/colors" {

@@ -4,6 +4,7 @@ import type { McColorName } from "../util/mcColors";
 import type { Config } from "../config";
 import type { GameMode } from "./game";
 import type { WindowApi } from "../interface/windowApi";
+import type { TitleApi } from "../interface/titleApi";
 import type { EnrichmentEngine } from "./enrichment";
 
 export interface PlayerRef {
@@ -58,6 +59,7 @@ export interface Session {
     game: GameMode; // active game, detected and kept up to date by nametagStats
     lobby: boolean;
     readonly windows: WindowApi; // chest rewrites
+    readonly title: TitleApi;
     sendUpstream(message: string): void; // send a message/command as if typed
     sendPacket(name: string, data: unknown): void; // write a decoded packet to the client
     sendServerPacket(name: string, data: unknown): void; // write a decoded packet to hypixel, as if the client sent it

@@ -13,6 +13,7 @@ import { LobbyTracker, parseWhoResponse, type PlayerInfoPacket } from "../core/l
 import { dashUuid } from "../services/microsoft";
 import { makeChatInjector, parseChat, parsePlayerChat, PREFIX } from "../core/chat";
 import { createWindowApi } from "../interface/windowApi";
+import { createTitleApi } from "../interface/titleApi";
 import type { ChatMessage, Session } from "../core/types";
 
 const log = createLogger("proxy");
@@ -194,6 +195,13 @@ export class ProxyServer {
                 onError: (error) => clog.debug(`window api: ${error}`),
             },
         );
+        const title = createTitleApi(
+            { sendPacket: toClient },
+            {
+                version: this.config.proxy.version,
+                onError: (error) => clog.debug(`title api: ${error}`),
+            },
+        );
         const session: Session = { // player sessions
             id,
             username: client.username,
@@ -202,6 +210,7 @@ export class ProxyServer {
             game: "unknown", // nametagStats fills this in off the scoreboard and we dont have a scoreboard yet - also irrelevant anyways if nametagStats is off
             lobby: true,
             windows,
+            title,
             sendUpstream: (message: string) => {
                 if (target.state === states.PLAY) target.write("chat", { message });
             },
@@ -221,6 +230,7 @@ export class ProxyServer {
             this.lastGameStart.delete(session.id);
             this.bedwarsStarted.delete(session.id);
             windows.dispose();
+            title.dispose();
             try {
                 client.end("Proxy connection closed");
             } catch {
@@ -239,6 +249,7 @@ export class ProxyServer {
             // chat is the one packet we do not blind-forward, see below
             if (meta.name === "chat") return;
             if (meta.state === states.PLAY && client.state === states.PLAY) client.writeRaw(buffer);
+            if (meta.state === states.PLAY) title.flush();
         });
         target.on("packet", (data: any, meta: { name: string; state: string }) => {
             if (meta.state !== states.PLAY) return;
@@ -254,6 +265,7 @@ export class ProxyServer {
                 // windows before the event, so a plugin reading session.windows in
                 // a serverPacket handler is looking at the current state
                 windows.handleServerPacket(meta.name, data);
+                title.handlePacket(meta.name, data);
                 this.bus.emit("serverPacket", meta.name, data, session);
             } catch (error) {
                 clog.debug(`parse error: ${error}`);
@@ -264,6 +276,7 @@ export class ProxyServer {
             if (meta.name === "chat" && !hideChat && client.state === states.PLAY) {
                 client.write("chat", { message: data.message, position: data.position ?? 0 });
             }
+            if (meta.name === "chat") title.flush();
         });
         target.once("login", () => clog.info("upstream authenticated & connected"));
         target.on("error", (error: unknown) => cleanup("upstream error", (error as Error)?.message));
