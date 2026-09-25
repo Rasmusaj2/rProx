@@ -1,19 +1,30 @@
-/**
- * High-level boss bar interface over the low-level packet injector.
- *
- * A BossBarApi owns its injector, routes server and client packets, and
- * coalesces bar updates when autoFlush is enabled. A bar is a legacy-section
- * title plus a progress value between 0 and 1.
- *
- * Use createBossBarApi(host, options) to create one for a session. Feed every
- * relevant server packet to handleServerPacket and client movement packets to
- * handleClientPacket. Use set to draw a bar, clear to restore the server bar,
- * and flush to render immediately when autoFlush is disabled.
- *
- * setMode controls whether the API replaces, adopts, or coexists with a server
- * bar. setEntity controls the entity used for a bar owned by the API.
- * dispose drops pending work without sending restoration packets.
- */
+// interface api for interacting with the bossbar at a higher level than in core
+// BossBarInjector in core thinks in entities, metadata and packet diffs.
+// this api owns an injector, routes packets into it, and coalesces updates into flushes.
+// a bar is a legacy §-string title plus a progress value between 0 and 1.
+
+// FUNCTIONS
+// createBossBarApi(host, options) - session & options in, a BossBarApi out
+// BossBarApi.handleServerPacket(name, data) - feed every server packet through here, returns whether it was one we care about
+// BossBarApi.handleClientPacket(name, data) - feed every client movement packet through here, returns whether it was one we care about
+// BossBarApi.set(bar) - draw a bar, null hands the screen back to hypixel
+// BossBarApi.flush() - render and send now instead of waiting for the coalesced flush
+// BossBarApi.clear() - drop our bar and put hypixels back
+// BossBarApi.setMode(mode) - switch between replace, adopt, and own
+// BossBarApi.setEntity(entity) - choose the entity for a bar we spawned
+// BossBarApi.describe() - debug lines for the //bossbar command
+// BossBarApi.dispose() - drop pending work without restoring hypixels bar
+
+// PROPERTIES
+// BossBarApi.bar - the bar we are drawing, a copy, null when we are not drawing one
+// BossBarApi.hosting - none, own, or adopted, whether we currently have a bar on screen
+// BossBarApi.mode - the mode in effect
+// BossBarApi.entity - the entity in effect
+
+// MODES
+// replace: make our own entity, hide hypixels, and overwrite to what we need
+// adopt: write our text onto hypixels boss and keep rewriting it
+// own: make our own entity and keep it up, but do not hide hypixels bosses - will flicker between boss bars
 
 import {
     BossBarInjector,
