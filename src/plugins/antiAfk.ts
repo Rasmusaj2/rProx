@@ -27,6 +27,9 @@ const KEEP_TOKENS = 4;
 // what counts as a dm command
 const DM_COMMAND = /^\/(?:msg|m|w|tell|r|reply|message|pm)\b/i;
 
+//hypixel shows this when /status offline, avoid sending dms as it errors
+const APPEARING_OFFLINE = /appearing offline/i;
+
 interface AfkState {
     timer?: NodeJS.Timeout;
     retry?: NodeJS.Timeout; // a send pushed back to clear the dm cooldown
@@ -95,6 +98,11 @@ export const antiAfkPlugin: Plugin = {
         const tick = (session: Session, state: AfkState): void => {
             if (config.lobbyOnly && !session.lobby) {
                 api.log.debug(`skipping anti-afk dm for ${session.username}, in a game`);
+                return;
+            }
+            // appearing offline, the dm will not register, wait for the notice to go
+            if (APPEARING_OFFLINE.test(session.title.displayText)) {
+                api.log.debug(`skipping anti-afk dm for ${session.username}, appearing offline`);
                 return;
             }
             // dm sent too recently, wait for cooldown

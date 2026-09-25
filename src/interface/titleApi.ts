@@ -15,6 +15,7 @@
 //
 // PROPERTIES
 // TitleApi.title / subtitle / actionBar - the current encoded values, ours when overridden
+// TitleApi.displayText - plain text of every overlay combined, "" when nothing is shown
 // TitleApi.times - the current fade-in, stay, and fade-out durations
 //
 // METHODS
@@ -35,6 +36,7 @@ import {
     DEFAULT_TITLE_TIMES,
     TitleInjector,
     createTitleInjector,
+    plainTitleText,
     textComponent,
     titleComponent,
     type TitleText,
@@ -46,6 +48,7 @@ export {
     DEFAULT_TITLE_TIMES,
     TitleInjector,
     createTitleInjector,
+    plainTitleText,
     textComponent,
     titleComponent,
 };
@@ -64,6 +67,7 @@ export interface TitleApi {
     readonly title: TitleText | undefined;
     readonly subtitle: TitleText | undefined;
     readonly actionBar: TitleText | undefined;
+    readonly displayText: string;
     readonly times: TitleTimes;
     handlePacket(name: string, data: unknown): boolean;
     clearServerState(): void;
@@ -159,6 +163,19 @@ class TitleApiImpl implements TitleApi {
 
     get actionBar(): TitleText | undefined {
         return this.injector.currentActionBar;
+    }
+
+    // plain text of every overlay, so a plugin can match a notice without
+    // caring which of title, subtitle, or action bar hypixel put it in
+    get displayText(): string {
+        return [
+            this.injector.currentTitle,
+            this.injector.currentSubtitle,
+            this.injector.currentActionBar,
+        ]
+            .map(plainTitleText)
+            .filter(Boolean)
+            .join(" ");
     }
 
     get times(): TitleTimes {

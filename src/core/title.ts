@@ -1,3 +1,5 @@
+import { stripColorCodes } from "../util/mcColors";
+
 export type TitleText = string | readonly unknown[] | Readonly<Record<string, unknown>>;
 
 export interface TitleTimes {
@@ -61,6 +63,27 @@ export function titleComponent(value: TitleText, version: string): TitleText {
 
 export function textComponent(text: string): Record<string, string> {
     return { text };
+}
+
+// flatten an encoded title value - a json string on 1.8, a component object or
+// array on newer versions - down to the plain text a player would read. never
+// throws and returns "" for anything empty, so callers dont have to null-check
+export function plainTitleText(value: TitleText | null | undefined): string {
+    if (value === undefined || value === null) return "";
+    const raw: unknown = typeof value === "string" ? parsedComponent(value) ?? value : value;
+    return stripColorCodes(flattenTitle(raw));
+}
+
+function flattenTitle(node: unknown): string {
+    if (typeof node === "string") return node;
+    if (Array.isArray(node)) return node.map(flattenTitle).join("");
+    if (node !== null && typeof node === "object") {
+        const record = node as Record<string, unknown>;
+        let out = typeof record.text === "string" ? record.text : "";
+        if (record.extra !== undefined) out += flattenTitle(record.extra);
+        return out;
+    }
+    return "";
 }
 
 function wireEquals(a: unknown, b: unknown): boolean {
