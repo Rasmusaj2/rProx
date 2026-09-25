@@ -91,6 +91,7 @@ const TITLES: Array<[pattern: RegExp, game: GameMode]> = [
     [/MURDER\s*MYSTERY/, "murdermystery"],
     [/BLITZ\s*SG/, "blitz"],
     [/COPS\s*AND\s*CRIMS/, "cvc"],
+    [/[\u9290\u9291]/, "cvc"], // mid cvc game characets
     [/MEGA\s*WALLS?/, "megawalls"],
     [/SMASH\s*HEROES?/, "smashheroes"],
     [/WARLORDS?/, "warlords"],
