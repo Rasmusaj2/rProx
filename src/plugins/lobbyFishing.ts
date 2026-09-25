@@ -1,7 +1,7 @@
 import { PREFIX, component, componentToLegacy } from "../core/chat";
-import { BossBarInjector, type BossBarMode, type BossEntity } from "../core/bossbar";
 import { gameFromTitle } from "../core/game";
 import { MAX_ENTRY, SIDEBAR_LINES } from "../core/sidebar";
+import { createBossBarApi, type BossBarApi, type BossBarMode, type BossEntity } from "../interface/bossbarApi";
 import { SidebarApi } from "../interface/sidebarApi";
 import {
     DEFAULT_HEAT,
@@ -104,7 +104,7 @@ interface SessionState {
     startedAt?: number; // starts at first catch
     sidebar: SidebarApi;
     dumped?: boolean; // logged this lobbys rows already
-    bossbar: BossBarInjector;
+    bossbar: BossBarApi;
     fight: MythicalFight;
     ticker?: NodeJS.Timeout; // only runs while a mythical is on the line
     demoUntil?: number; // or while //bossbar test is showing off
@@ -206,7 +206,12 @@ export const lobbyFishingPlugin: Plugin = {
                     totals: emptyTotals(),
                     mythicals: {},
                     sidebar,
-                    bossbar: new BossBarInjector({ mode: bossBarMode, entity: bossEntity }),
+                    bossbar: createBossBarApi(session, {
+                        mode: bossBarMode,
+                        entity: bossEntity,
+                        autoFlush: false,
+                        onError: (error) => api.log.debug(`boss bar update failed: ${error}`),
+                    }),
                     fight: new MythicalFight(heat),
                 };
                 sessions.set(session.id, state);
@@ -286,21 +291,13 @@ export const lobbyFishingPlugin: Plugin = {
             return fight.heat / heat.max;
         }
 
-        function pushBar(session: Session, state: SessionState): void {
-            try {
-                state.bossbar.flush((name, data) => session.sendPacket(name, data));
-            } catch (error) {
-                api.log.debug(`boss bar update failed: ${error}`);
-            }
-        }
-
         function stopTicker(state: SessionState): void {
             if (state.ticker) clearInterval(state.ticker);
             state.ticker = undefined;
         }
 
         // heat only moves with time on test bar
-        function startTicker(session: Session, state: SessionState): void {
+        function startTicker(state: SessionState): void {
             if (state.ticker) return;
             let announced = false;
             state.ticker = setInterval(() => {
@@ -314,23 +311,23 @@ export const lobbyFishingPlugin: Plugin = {
                             title: `§b§lrProx test bar §8| §f${Math.round(progress * 100)}% §8| §7${left.toFixed(0)}s`,
                             progress,
                         });
-                        pushBar(session, state);
+                        state.bossbar.flush();
                         return;
                     }
                     state.demoUntil = undefined;
                     state.bossbar.set(null);
-                    pushBar(session, state);
+                    state.bossbar.flush();
                 }
                 const fight = state.fight.sample(now);
                 if (!fight) {
                     stopTicker(state);
                     state.bossbar.set(null);
-                    pushBar(session, state);
+                    state.bossbar.flush();
                     return;
                 }
                 if (!config.mythical?.bossBar) return;
                 state.bossbar.set({ title: barTitle(fight), progress: barProgress(fight) });
-                pushBar(session, state);
+                state.bossbar.flush();
                 // whether the bar we ended up on is one of hypixels or one of ours
                 // is the first thing worth knowing when it does not show up
                 if (!announced) {
@@ -341,8 +338,7 @@ export const lobbyFishingPlugin: Plugin = {
             state.ticker.unref?.();
         }
 
-        function moved(state: SessionState, x: number, y: number, z: number): void {
-            state.bossbar.setPlayerPosition(x, y, z);
+        function trackPlayer(state: SessionState, x: number, y: number, z: number): void {
             state.fight.setPlayerPosition(x, y, z);
         }
 
@@ -350,6 +346,7 @@ export const lobbyFishingPlugin: Plugin = {
         api.on("serverPacket", (name, data, session) => {
             if (!config.mythical?.enabled) return;
             const state = stateFor(session);
+            state.bossbar.handleServerPacket(name, data);
             const now = Date.now();
             try {
                 switch (name) {
@@ -363,7 +360,6 @@ export const lobbyFishingPlugin: Plugin = {
                         if (data.slot === HEAD_SLOT) state.fight.trackHead(data.entityId, orbFromSkull(data.item));
                         return;
                     case "entity_metadata": {
-                        state.bossbar.applyMetadata(data);
                         const custom = customName(data.metadata);
                         if (custom === undefined) return;
                         const before = state.fight.active;
@@ -375,34 +371,15 @@ export const lobbyFishingPlugin: Plugin = {
                         }
                         if (!before) {
                             api.log.debug(`mythical on the line: ${JSON.stringify(custom)}`);
-                            startTicker(session, state);
+                            startTicker(state);
                         }
                         return;
                     }
                     case "entity_destroy":
-                        state.bossbar.applyDestroy(data);
                         state.fight.remove(data.entityIds ?? []);
                         return;
-                    case "spawn_entity_living":
-                        state.bossbar.applySpawnLiving(data);
-                        return;
-                    case "update_attributes":
-                        state.bossbar.applyAttributes(data);
-                        return;
-                    case "entity_teleport":
-                    case "rel_entity_move":
-                    case "entity_move_look":
-                    case "entity_look":
-                        state.bossbar.applyMove(name, data);
-                        return;
-                    case "entity_head_rotation":
-                        state.bossbar.applyHeadRotation(data);
-                        return;
                     case "position":
-                        if (!data.flags) {
-                            moved(state, data.x, data.y, data.z);
-                            state.bossbar.setPlayerLook(data.yaw, data.pitch);
-                        }
+                        if (!data.flags) trackPlayer(state, data.x, data.y, data.z);
                         return;
                     case "title":
                         if (data.action !== 0 && data.action !== 1) return;
@@ -410,8 +387,7 @@ export const lobbyFishingPlugin: Plugin = {
                         state.fight.arm(now);
                         return;
                     case "login":
-                    case "respawn": // on server transfer throw away everything
-                        state.bossbar.clear();
+                    case "respawn":
                         state.fight.end();
                         stopTicker(state);
                         return;
@@ -426,18 +402,13 @@ export const lobbyFishingPlugin: Plugin = {
         api.on("clientPacket", (name, data, session) => {
             if (!config.mythical?.enabled) return;
             const state = stateFor(session);
+            state.bossbar.handleClientPacket(name, data);
             try {
-                // a wither only draws a bar while it is in shot, so where the player
-                // is looking is as load bearing as where they are standing
                 if (name === "position" || name === "position_look") {
-                    moved(state, data.x, data.y, data.z);
-                    if (name === "position_look") state.bossbar.setPlayerLook(data.yaw, data.pitch);
+                    trackPlayer(state, data.x, data.y, data.z);
                     return;
                 }
-                if (name === "look") {
-                    state.bossbar.setPlayerLook(data.yaw, data.pitch);
-                    return;
-                }
+                if (name === "look") return;
                 if (!state.fight.active) return;
                 // a reel is a right click on nothing, aiming at an entity doesnt send this packet but does an entity interaction as well
                 // which doesnt count, same reason a rod isnt thrown in this case
@@ -473,6 +444,7 @@ export const lobbyFishingPlugin: Plugin = {
             const state = sessions.get(session.id);
             if (state) {
                 state.sidebar.dispose();
+                state.bossbar.dispose();
                 stopTicker(state);
             }
             sessions.delete(session.id);
@@ -526,21 +498,19 @@ export const lobbyFishingPlugin: Plugin = {
                 "bossbar",
                 (args, session) => {
                     const state = stateFor(session);
-                    const send = (name: string, data: unknown) => session.sendPacket(name, data);
                     const sub = args[0]?.toLowerCase() ?? "info";
                     switch (sub) {
                         case "test": {
                             const seconds = Math.min(120, positive(Number(args[1]), DEMO_SECONDS));
                             state.demoUntil = Date.now() + seconds * 1000;
-                            startTicker(session, state);
+                            startTicker(state);
                             session.chat.text(`${PREFIX} §7Test bar up for §f${seconds}s §8(${state.bossbar.hosting})`);
                             return;
                         }
                         case "off":
                             state.demoUntil = undefined;
                             state.fight.end();
-                            state.bossbar.set(null);
-                            pushBar(session, state);
+                            state.bossbar.clear();
                             stopTicker(state);
                             session.chat.text(`${PREFIX} §7Bar cleared.`);
                             return;
@@ -550,7 +520,7 @@ export const lobbyFishingPlugin: Plugin = {
                                 session.chat.text(`${PREFIX} §7Modes: §f${BAR_MODES.join("§7, §f")}`);
                                 return;
                             }
-                            state.bossbar.setMode(mode, send);
+                            state.bossbar.setMode(mode);
                             session.chat.text(`${PREFIX} §7Boss bar mode is now §f${mode}§7.`);
                             return;
                         }
@@ -560,7 +530,7 @@ export const lobbyFishingPlugin: Plugin = {
                                 session.chat.text(`${PREFIX} §7Entities: §f${BOSS_ENTITIES.join("§7, §f")}`);
                                 return;
                             }
-                            state.bossbar.setEntity(entity, send);
+                            state.bossbar.setEntity(entity);
                             session.chat.text(`${PREFIX} §7Boss bar entity is now §f${entity}§7.`);
                             return;
                         }
