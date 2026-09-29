@@ -16,6 +16,7 @@ export function createCoreCommandsPlugin(
         name: "Core",
         version: "0.3.0",
         description: "Plugin containing core commands (//help, //who, //plugins, etc), and common helpful utilities",
+        forceLoad: true, // disabling this would take //config (and //help, //plugins) with it
 
         defaultConfig: {
             enabled: true,
@@ -71,7 +72,29 @@ export function createCoreCommandsPlugin(
             );
             
             if (api.config.proxy.allowIngameEditing) { // limit to if allowed
-                const editor = createConfigEditor({ config: api.config, prefix, log: api.log });
+                const editor = createConfigEditor({
+                    config: api.config,
+                    prefix,
+                    log: api.log,
+                    // refuse to turn off a plugin the proxy cannot run without
+                    guard: (path, value) => {
+                        const name = pluginToggleTarget(path);
+                        if (name && value === false && plugins.isForced(name)) {
+                            return `"${name}" is required and cannot be disabled`;
+                        }
+                        return undefined;
+                    },
+                    // a plugins enabled flag just moved, load or unload it now
+                    onSet: (session, path, value) => {
+                        const name = pluginToggleTarget(path);
+                        if (!name) return;
+                        const enabled = value === true;
+                        void plugins.setEnabled(name, enabled).then((changed) => {
+                            if (changed) session.chat.text(`${PREFIX} §7${enabled ? "Loaded" : "Unloaded"} plugin §f${name}§7.`);
+                        });
+                    },
+                });
+                api.onCleanup(() => editor.dispose());
 
                 api.registerCommand(
                     "config",
@@ -133,6 +156,11 @@ export function createCoreCommandsPlugin(
             });
         }
     }
+}
+
+// the path a plugin on/off toggle lands on, builtInPlugins.<name>.enabled
+function pluginToggleTarget(path: string[]): string | undefined {
+    return path.length === 3 && path[0] === "builtInPlugins" && path[2] === "enabled" ? path[1] : undefined;
 }
 
 // is there anything to navigate into at this path

@@ -55,6 +55,14 @@ export class EnrichmentEngine {
         log.debug(`registered enricher "${enricher.name}"`);
     }
 
+    unregister(enricher: Enricher): void {
+        const index = this.enrichers.indexOf(enricher);
+        if (index >= 0) {
+            this.enrichers.splice(index, 1);
+            log.debug(`unregistered enricher "${enricher.name}"`);
+        }
+    }
+
     // drop a sessions debounce entries once it goes away, otherwise the map keeps
     forgetSession(id: string): void {
         const prefix = `${id}:`;

@@ -509,6 +509,10 @@ export function registerNickbook(api: PluginApi): void {
 
     api.on("sessionEnd", (session) => dispose(session.id));
 
+    api.onCleanup(() => {
+        for (const id of [...sessions.keys()]) dispose(id);
+    });
+
     api.log.info(
         `nickbook active and rolls land in chat (${commandPrefix}nickuse, ${commandPrefix}nickreroll)`,
     );

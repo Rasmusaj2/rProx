@@ -33,6 +33,7 @@ export interface ConfigEditor {
     editing(session: Session): boolean;
     cancel(session: Session): boolean;
     forget(sessionId: string): void;
+    dispose(): void; // close every open menu, for when the plugin owning the editor is unloaded
 }
 
 function isBlock(value: unknown): value is Record<string, unknown> {
@@ -155,9 +156,11 @@ export interface ConfigEditorDeps {
     config: Config;
     prefix: string; // config.commandPrefix, for the clickable hints
     log: Logger;
+    guard?: (path: string[], value: unknown) => string | undefined; // return an error to refuse the write
+    onSet?: (session: Session, path: string[], value: unknown) => void; // a value was written and saved
 }
 
-export function createConfigEditor({ config, prefix, log }: ConfigEditorDeps): ConfigEditor {
+export function createConfigEditor({ config, prefix, log, guard, onSet }: ConfigEditorDeps): ConfigEditor {
     const sessions = new Map<string, EditorState>();
 
     function stateFor(session: Session): EditorState {
@@ -234,8 +237,8 @@ export function createConfigEditor({ config, prefix, log }: ConfigEditorDeps): C
             "",
             "§7Changes are written straight to",
             "§7config.json when you set them.",
-            "§8plugins that read their settings",
-            "§8once at startup want a restart",
+            "§8toggling a plugin's enabled",
+            "§8loads or unloads it right away",
         ];
         if (state.path.length) lore.splice(1, 0, `§8${dotted(state.path)}`);
         return {
@@ -405,6 +408,11 @@ export function createConfigEditor({ config, prefix, log }: ConfigEditorDeps): C
     }
 
     function applyValue(session: Session, path: string[], value: unknown, announce = true): boolean {
+        const refusal = guard?.(path, value);
+        if (refusal) {
+            session.chat.text(`${PREFIX} §c${refusal}`);
+            return false;
+        }
         if (!writeAt(config as unknown as Record<string, unknown>, path, value)) {
             session.chat.text(`${PREFIX} §cCould not write §f${dotted(path)}§c, the path is gone`);
             return false;
@@ -415,6 +423,7 @@ export function createConfigEditor({ config, prefix, log }: ConfigEditorDeps): C
             session.chat.text(`${PREFIX} §aSet §f${dotted(path)} §7to ${preview(value)}`);
         }
         if (!saved) session.chat.text(`${PREFIX} §cThe value is live but config.json could not be written`);
+        onSet?.(session, path, value);
         return true;
     }
 
@@ -500,6 +509,10 @@ export function createConfigEditor({ config, prefix, log }: ConfigEditorDeps): C
         forget: (id) => {
             sessions.get(id)?.menu?.close();
             sessions.delete(id);
+        },
+        dispose: () => {
+            for (const state of sessions.values()) state.menu?.close();
+            sessions.clear();
         },
     };
 }

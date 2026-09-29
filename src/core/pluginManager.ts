@@ -29,6 +29,9 @@ export class PluginManager {
     private clientFilters: Array<{ filter: ClientFilter; plugin: string }> = []; // allows blocking client packets from being sent to the server
     private loaded: string[] = [];
     private freshDefaults: string[] = []; // plugins whose defaults are not in config.json yet
+    private sources = new Map<string, { plugin: Plugin; file?: string }>(); // plugin name -> the instance to reload from
+    private cleanups = new Map<string, Array<() => void>>(); // what each plugin registered, so a toggle can undo it
+    private loading = new Set<string>(); // plugins with a setup in flight, so a double toggle cannot run it twice
 
     constructor(
         private readonly config: Config,
@@ -39,6 +42,12 @@ export class PluginManager {
 
     private pluginConfig(name: string): Record<string, unknown> {
         return (this.config.builtInPlugins[name] as Record<string, unknown>) ?? {};
+    }
+
+    private track(name: string, cleanup: () => void): void {
+        const list = this.cleanups.get(name) ?? [];
+        list.push(cleanup);
+        this.cleanups.set(name, list);
     }
 
     private ensureConfig(plugin: Plugin): void {
@@ -59,17 +68,45 @@ export class PluginManager {
             http: this.http,
             enrichment: this.enrichment,
             pluginConfig: this.pluginConfig(plugin.name),
-            on: (event, handler) => this.bus.on(event, handler), // handle subscription events for the plugin
-            registerEnricher: (enricher) => this.enrichment.register(enricher), // enricher voodoo plugin magic
+            on: (event, handler) => {
+                // handle subscription events for the plugin
+                this.bus.on(event, handler);
+                this.track(plugin.name, () => this.bus.off(event, handler));
+            },
+            registerEnricher: (enricher) => {
+                // enricher voodoo plugin magic
+                this.enrichment.register(enricher);
+                this.track(plugin.name, () => this.enrichment.unregister(enricher));
+            },
             registerCommand: (name, handler, help) => {
                 const key = name.toLowerCase();
                 if (this.commands.has(key)) {
                     log.warn(`command "${name}" already registered, overriding it (plugin ${plugin.name})`);
                 }
-                this.commands.set(key, { handler, help, plugin: plugin.name });
+                const record: RegisteredCommand = { handler, help, plugin: plugin.name };
+                this.commands.set(key, record);
+                // only drop it on unload if nobody replaced it since
+                this.track(plugin.name, () => {
+                    if (this.commands.get(key) === record) this.commands.delete(key);
+                });
             },
-            registerChatFilter: (filter) => this.chatFilters.push({ filter, plugin: plugin.name }),
-            registerClientFilter: (filter) => this.clientFilters.push({ filter, plugin: plugin.name }),
+            registerChatFilter: (filter) => {
+                const entry = { filter, plugin: plugin.name };
+                this.chatFilters.push(entry);
+                this.track(plugin.name, () => {
+                    const index = this.chatFilters.indexOf(entry);
+                    if (index >= 0) this.chatFilters.splice(index, 1);
+                });
+            },
+            registerClientFilter: (filter) => {
+                const entry = { filter, plugin: plugin.name };
+                this.clientFilters.push(entry);
+                this.track(plugin.name, () => {
+                    const index = this.clientFilters.indexOf(entry);
+                    if (index >= 0) this.clientFilters.splice(index, 1);
+                });
+            },
+            onCleanup: (handler) => this.track(plugin.name, handler),
         };
     }
 
@@ -104,23 +141,71 @@ export class PluginManager {
 
     // a plugin is on unless its config block says enabled: false.
     // whoever registers a batch flushes the config afterwards, see registerAll
-    async register(plugin: Plugin): Promise<void> {
+    async register(plugin: Plugin, file?: string): Promise<void> {
+        // remember how to bring it back if config toggles it on later
+        if (!this.sources.has(plugin.name)) this.sources.set(plugin.name, { plugin, file });
         // a disabled plugin still gets its block, so the settings it would have
         // read are there to look at before turning it back on
         this.ensureConfig(plugin);
-        if (this.pluginConfig(plugin.name).enabled === false) { // yes this does mean you can disable external plugins in the config.json file
+        if (this.pluginConfig(plugin.name).enabled === false && !plugin.forceLoad) { // yes this does mean you can disable external plugins in the config.json file
             // i should probably make a seperate config thing for external plugins, but honestly i dont care enough and they should implement it themselves for now
             // untill i get around to making a "externalPlugins" config area in the config.json file which external plugins can have a default config written to
             log.info(`skipping disabled plugin "${plugin.name}"`);
             return;
         }
+        if (this.loaded.includes(plugin.name) || this.loading.has(plugin.name)) return; // already on, a toggle is a no-op
+        this.loading.add(plugin.name);
         try {
             await plugin.setup(this.buildApi(plugin));
             this.loaded.push(plugin.name);
             log.info(`loaded plugin "${plugin.name}"${plugin.version ? ` v${plugin.version}` : ""}`);
         } catch (error) {
+            this.teardown(plugin.name); // drop whatever half of setup managed to register
             log.error(`failed to load plugin "${plugin.name}": ${error}`);
+        } finally {
+            this.loading.delete(plugin.name);
         }
+    }
+
+    // undo everything a plugin registered through the api, then let it clear the
+    // timers only it knows about (see onCleanup)
+    private teardown(name: string): void {
+        for (const cleanup of this.cleanups.get(name) ?? []) {
+            try {
+                cleanup();
+            } catch (error) {
+                log.error(`cleanup for plugin "${name}" threw: ${error}`);
+            }
+        }
+        this.cleanups.delete(name);
+        const index = this.loaded.indexOf(name);
+        if (index >= 0) this.loaded.splice(index, 1);
+    }
+
+    // config toggled a plugins enabled flag, bring it up or down to match
+    async setEnabled(name: string, enabled: boolean): Promise<boolean> {
+        const source = this.sources.get(name);
+        if (!source) {
+            log.warn(`cannot toggle "${name}", no such plugin`);
+            return false;
+        }
+        if (!enabled && source.plugin.forceLoad) {
+            log.warn(`plugin "${name}" is required and cannot be disabled`);
+            return false;
+        }
+        if (enabled) {
+            if (this.loaded.includes(name) || this.loading.has(name)) return false;
+            await this.register(source.plugin, source.file);
+            return this.loaded.includes(name);
+        }
+        if (!this.loaded.includes(name)) return false;
+        this.teardown(name);
+        log.info(`unloaded plugin "${name}" (disabled in config)`);
+        return true;
+    }
+
+    isForced(name: string): boolean {
+        return this.sources.get(name)?.plugin.forceLoad === true;
     }
 
     async registerAll(plugins: Plugin[]): Promise<void> {
@@ -165,7 +250,7 @@ export class PluginManager {
                     log.warn(`ignoring ${file}, not a valid plugin (needs { name, setup })`);
                     continue;
                 }
-                await this.register(plugin);
+                await this.register(plugin, file);
             } catch (error) {
                 log.error(`failed to import external plugin ${file}: ${error}`);
             }

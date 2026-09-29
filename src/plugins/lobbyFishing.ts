@@ -450,6 +450,15 @@ export const lobbyFishingPlugin: Plugin = {
             sessions.delete(session.id);
         });
 
+        api.onCleanup(() => {
+            for (const state of sessions.values()) {
+                state.sidebar.dispose();
+                state.bossbar.dispose();
+                stopTicker(state);
+            }
+            sessions.clear();
+        });
+
         api.registerCommand(
             "session",
             (args, session) => {

@@ -688,6 +688,18 @@ export const urchinPlugin: Plugin = {
 
         api.on("sessionEnd", (session) => sessions.delete(session.id));
 
+        api.onCleanup(() => {
+            if (batchTimer) {
+                clearTimeout(batchTimer);
+                batchTimer = null;
+            }
+            // nobody is waiting on these lookups anymore, hand back empty tags
+            for (const waiters of queue.values()) for (const waiter of waiters) waiter.resolve([]);
+            queue.clear();
+            cache.dispose();
+            sessions.clear();
+        });
+
         const target = (args: string[], session: Session): PlayerRef => {
             const name = args[0] ?? session.username;
             return session.findPlayer(name) ?? { name };

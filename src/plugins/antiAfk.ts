@@ -148,6 +148,11 @@ export const antiAfkPlugin: Plugin = {
         });
         api.on("sessionEnd", (session) => stop(session.id));
 
+        // letting go of every running interval when the plugin is turned off
+        api.onCleanup(() => {
+            for (const id of [...sessions.keys()]) stop(id);
+        });
+
         // remember whenever you send something, so a tick can yield to you
         api.on("clientPacket", (name, data: any, session) => {
             if (name !== "chat" || typeof data?.message !== "string") return;

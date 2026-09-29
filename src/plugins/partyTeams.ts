@@ -97,6 +97,13 @@ export const partyTeamsPlugin: Plugin = {
             sessions.delete(session.id);
         });
 
+        api.onCleanup(() => {
+            for (const state of sessions.values()) {
+                if (state.timer) clearTimeout(state.timer);
+            }
+            sessions.clear();
+        });
+
         api.on("serverPacket", (name, data, session) => {
             const state = stateFor(session);
             if (name === "login") {

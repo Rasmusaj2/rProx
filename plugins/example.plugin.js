@@ -44,5 +44,12 @@ module.exports = {
             bars.get(session.id)?.dispose();
             bars.delete(session.id);
         });
+
+        // runs when this plugin is disabled or reloaded through the config menu, so
+        // anything the api cannot track (timers, sidebars, open windows) gets let go of
+        api.onCleanup(() => {
+            for (const sidebar of bars.values()) sidebar.dispose();
+            bars.clear();
+        });
     },
 };

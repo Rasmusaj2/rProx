@@ -137,6 +137,14 @@ export const duelsStatsPlugin: Plugin = {
             sessions.delete(session.id);
         });
 
+        api.onCleanup(() => {
+            for (const state of sessions.values()) {
+                if (state.timer) clearTimeout(state.timer);
+                if (state.rankTimer) clearTimeout(state.rankTimer);
+            }
+            sessions.clear();
+        });
+
         const rankOf = (color: string): Rank => ({ color, label: RANK_COLORS[color] });
 
         const rankKey = (name: string): string => stripColorCodes(name).replace(/[^a-z0-9_]/gi, "").toLowerCase();

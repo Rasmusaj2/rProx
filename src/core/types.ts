@@ -107,6 +107,7 @@ export interface PluginApi {
     registerCommand(name: string, handler: CommandHandler, help?: string): void;
     registerChatFilter(filter: ChatFilter): void;
     registerClientFilter(filter: ClientFilter): void;
+    onCleanup(handler: () => void): void; // runs when the plugin is disabled/reloaded, for timers the api cannot track
 }
 
 export interface Plugin {
@@ -114,5 +115,6 @@ export interface Plugin {
     version?: string;
     description?: string;
     defaultConfig?: Record<string, unknown>;
+    forceLoad?: boolean; // cannot be disabled from config (ie. Core, which owns //config)
     setup(api: PluginApi): void | Promise<void>;
 }

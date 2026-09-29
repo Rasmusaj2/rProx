@@ -241,6 +241,13 @@ export function createNametagStatsPlugin(enrichment: EnrichmentEngine): Plugin {
                 sessions.delete(session.id);
             });
 
+            api.onCleanup(() => {
+                for (const state of sessions.values()) {
+                    for (const timer of state.retries.values()) clearTimeout(timer);
+                }
+                sessions.clear();
+            });
+
             api.on("serverPacket", (name, data, session) => {
                 try {
                     if (name === "scoreboard_team") handleTeam(data, session); // update team info, which drives above-head nametags and tablist names
