@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { loadConfig } from "./config";
+import { configExists, loadConfig, saveConfig } from "./config";
 import { createLogger } from "./util/log";
 import { HttpClient } from "./util/http";
 import { EventBus } from "./core/events";
@@ -7,6 +7,7 @@ import { EnrichmentEngine } from "./core/enrichment";
 import { PluginManager } from "./core/pluginManager";
 import { ProxyServer } from "./proxy/server";
 import { PREFIX } from "./core/chat";
+import { runOnboarding } from "./onboarding";
 
 import { createCoreCommandsPlugin } from "./plugins/core";
 import { hypixelStatsPlugin } from "./plugins/hypixelStats";
@@ -19,6 +20,7 @@ import { partyTeamsPlugin } from "./plugins/partyTeams";
 import { duelsStatsPlugin } from "./plugins/duelsStats";
 
 async function main(): Promise<void> {
+    const firstRun = !configExists();
     const config = loadConfig();
     const log = createLogger("main");
     log.info("rProx starting...");
@@ -28,8 +30,7 @@ async function main(): Promise<void> {
     const enrichment = new EnrichmentEngine(http, config);
     const plugins = new PluginManager(config, bus, enrichment, http);
 
-    // load builtin plugins first
-    await plugins.registerAll([
+    const builtIn = [
         createCoreCommandsPlugin(enrichment, plugins, config.commandPrefix), // forceload
         hypixelStatsPlugin,
         createNametagStatsPlugin(enrichment),
@@ -39,7 +40,16 @@ async function main(): Promise<void> {
         urchinPlugin,
         partyTeamsPlugin,
         duelsStatsPlugin,
-    ]);
+    ];
+
+    // first boot onboarding setup
+    if (firstRun && process.stdin.isTTY) {
+        await runOnboarding(config, builtIn);
+        saveConfig(config);
+    }
+
+    // load builtin plugins first
+    await plugins.registerAll(builtIn);
 
     // then whatever is sitting in the plugin directory
     await plugins.loadExternal();

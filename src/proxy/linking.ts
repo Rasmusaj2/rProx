@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { Authflow, Titles } from "prismarine-auth";
 import { createLogger, type Logger } from "../util/log";
 import type { AccountStore } from "./accounts";
@@ -115,4 +118,76 @@ export class LinkManager { // pending links are keyed so people dont get a new c
             return { status: "failed", error: (error as Error).message };
         }
     }
+
+    // onboarding sign in not tied to a player yet
+    async session(onCode: (code: LinkCode) => void): Promise<SessionResult> {
+        const tempKey = `onboarding-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        const tempDir = this.accounts.profileDir(tempKey);
+        try {
+            const flow = new Authflow(
+                tempKey,
+                tempDir,
+                AUTH_OPTIONS,
+                (data: { user_code: string; verification_uri: string; expires_in?: number }) => {
+                    onCode({
+                        userCode: data.user_code,
+                        verificationUri: data.verification_uri,
+                        expiresAt: Date.now() + (data.expires_in ?? 900) * 1000,
+                    });
+                },
+            );
+            const result = await flow.getMinecraftJavaToken({ fetchProfile: true });
+            const profile = result?.profile as { id?: string; name?: string } | undefined;
+            if (!profile?.id) throw new Error("no Minecraft profile on that account");
+            // minecraft-protocol hands dashed form uuids
+            const uuid = profile.id.toLowerCase().replace(
+                /(\w{8})(\w{4})(\w{4})(\w{4})(\w{12})/,
+                "$1-$2-$3-$4-$5",
+            );
+            this.moveCache(tempDir, tempKey, this.accounts.profileDir(uuid), uuid);
+            rmSync(tempDir, { recursive: true, force: true });
+            this.accounts.link({
+                uuid,
+                username: profile.name ?? "",
+                mcUuid: uuid,
+                mcUsername: profile.name ?? "",
+                linkedAt: Date.now(),
+            });
+            this.log.info(`signed in and linked ${profile.name} (${uuid})`);
+            return { status: "ok", uuid, username: profile.name ?? "" };
+        } catch (error) {
+            try {
+                rmSync(tempDir, { recursive: true, force: true });
+            } catch {
+                // best effort
+            }
+            return { status: "failed", error: (error as Error).message };
+        }
+    }
+
+    // prismarine-auth names its cache files some bullshit
+    // rehash for real uuid
+    private moveCache(fromDir: string, fromKey: string, toDir: string, toKey: string): void {
+        if (!existsSync(fromDir)) return;
+        mkdirSync(toDir, { recursive: true });
+        const fromHash = cacheHash(fromKey);
+        const toHash = cacheHash(toKey);
+        for (const file of readdirSync(fromDir)) {
+            const target = file.startsWith(fromHash) ? `${toHash}${file.slice(fromHash.length)}` : file;
+            const destination = join(toDir, target);
+            if (existsSync(destination)) rmSync(destination, { force: true }); // re-running setup, replace the old cache
+            renameSync(join(fromDir, file), destination);
+        }
+    }
+}
+
+export interface SessionResult {
+    status: "ok" | "failed";
+    uuid?: string;
+    username?: string;
+    error?: string;
+}
+
+function cacheHash(input: string): string {
+    return createHash("sha1").update(input, "binary").digest("hex").slice(0, 6);
 }

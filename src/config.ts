@@ -99,6 +99,10 @@ export function configPath(): string {
     return fromBase(CONFIG_FILE);
 }
 
+export function configExists(): boolean {
+    return existsSync(configPath());
+}
+
 function readJson(path: string): unknown {
     try {
         return JSON.parse(readFileSync(path, "utf-8"));
