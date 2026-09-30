@@ -20,22 +20,53 @@ const log = createLogger("proxy");
 
 const states = mc.states;
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const FAVICON_SIZE = 64;
+
+// guess filetype based on byte buffer
+function fileKind(bytes: Buffer): string {
+    if (bytes.subarray(0, 4).toString("hex") === "52494646" && bytes.subarray(8, 12).toString("latin1") === "WEBP") return "webp";
+    if (bytes.subarray(0, 3).toString("hex") === "ffd8ff") return "jpeg";
+    if (bytes.subarray(0, 3).toString("latin1") === "GIF") return "gif";
+    return "unknown";
+}
+
+function toDataUri(bytes: Buffer): string {
+    return `data:image/png;base64,${bytes.toString("base64")}`;
+}
+
 // minecraft-protocol wants the server list icon as a data uri, we either allow path or base64 and convert it
 function resolveFavicon(icon: string): string | undefined {
     const value = icon.trim();
     if (!value) return undefined;
-    if (value.startsWith("data:")) return value;
+    if (value.startsWith("data:")) {
+        // try relabeling the mime type so the client decodes it as png
+        return value.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, "data:image/png;base64,");
+    }
     const path = isAbsolute(value) ? value : fromBase(value);
     if (!existsSync(path)) {
         log.warn(`proxy icon not found, ignoring: ${path}`);
         return undefined;
     }
+    let bytes: Buffer;
     try {
-        return `data:image/png;base64,${readFileSync(path).toString("base64")}`;
+        bytes = readFileSync(path);
     } catch (error) {
         log.warn(`could not read proxy icon ${path}: ${error}`);
         return undefined;
     }
+    // the client decodes the raw bytes itself, so jpeg/gif/bmp can still work.
+    // png is the only one we can read dimensions off, and 64x64 is required.
+    if (bytes.length >= 24 && bytes.subarray(0, 8).equals(PNG_SIGNATURE)) {
+        const width = bytes.readUInt32BE(16);
+        const height = bytes.readUInt32BE(20);
+        if (width !== FAVICON_SIZE || height !== FAVICON_SIZE) {
+            log.warn(`proxy icon is ${width}x${height}, the client only shows ${FAVICON_SIZE}x${FAVICON_SIZE}: ${path}`);
+        }
+    } else {
+        log.warn(`proxy icon is not a png (looks like ${fileKind(bytes)}), sending it as-is but the client may not decode it: ${path}`);
+    }
+    return toDataUri(bytes);
 }
 
 // game start lines
