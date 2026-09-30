@@ -19,7 +19,7 @@ After this rProx will be running on localhost:25565
 On first boot, rProx creates a config.json file. Close rProx, and edit the config file.
 > **Note:** Using //config, it is also possible to modify some configuration settings ingame.
 
-Here it is recommended to set your Hypixel, Urchin and Seraph API Keys.
+Here it is recommended to set your Hypixel and Urchin API Keys.
 
 After the config is edited, reopen rProx, connect to `127.0.0.1:25565` on Minecraft, and [`link`](https://microsoft.com/link) your Microsoft account.
 
@@ -82,7 +82,7 @@ The `proxy` block controls the server rProx presents to your client:
 
 `//bossbar [info|test [seconds]|off|mode <replace|adopt|own>|entity <dragon|wither>]` - Put a test boss bar up, print what the injector is holding, or change how it draws without a restart
 
-`//urchin [user]` - Check a users Urchin & Seraph tags
+`//urchin [user]` - Check a users Urchin tags
 
 `//config` - Open `config.json` as a chest gui and allows you to edit it ingame.
 > **Note:** Some config items are not editable while the process is running, and will require a restart.
@@ -188,7 +188,7 @@ Can be toggled with `//afk on` & `//afk off`
 ```
 * **Urchin**
 
-Urchin (Coral) & Seraph API support for cheaters
+Urchin (Coral) API support for cheaters
 
 Players can be looked up with `//urchin`
 ```json
@@ -206,13 +206,6 @@ Players can be looked up with `//urchin`
                 "onJoin": true, // when a new player joins a lobby
                 "onLobby": true, // when you join a new lobby
                 "repeatSeconds": 300 // gap between sending an alert for the same player
-            },
-            "seraph": {
-                "enabled": true, // use seraph as well
-                "apiKey": "", // seraph api key
-                "baseUrl": "https://api.seraph.si",
-                "scoreFactors": "",
-                "scoreThreshold": 0 // when to show a SNIPER tag based on seraphs sniper score
             }
         }
 ```

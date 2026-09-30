@@ -61,11 +61,6 @@ async function collectApiKeys(term: Terminal, config: Config): Promise<void> {
             `Find it using /dashboard using the Urchin Discord Bot.`,
             "Adds anti-cheat / blacklist tags next to names.",
         ]);
-        const seraph = isBlock(urchin.seraph) ? urchin.seraph : (urchin.seraph = {});
-        await promptKey(term, seraph as Block, "apiKey", "Seraph API key (optional)", [
-            `Find it in the Seraph Discord server using /generate-key`,
-            "Merged with Urchin as a second blacklist source.",
-        ]);
     }
     term.say("");
 }

@@ -1,13 +1,11 @@
 import { PREFIX, component, type ChatPart } from "../core/chat";
 import { actionName, hasNpcRank, isFakeUuid } from "../core/lobby";
-import { resolveUuid } from "../services/microsoft";
-import { COLOR_CODES, COLOR_RGB, type McColorName } from "../util/mcColors";
+import { COLOR_CODES, type McColorName } from "../util/mcColors";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
 import { TtlCache } from "../util/ttlCache";
 
-// blacklist tags from urchin (coral) & seraph anticheater apis
+// blacklist tags from urchin (coral) api
 const URCHIN_BASE = "https://api.urchin.gg";
-const SERAPH_BASE = "https://api.seraph.si";
 
 const BATCH_LIMIT = 100; // what urchins POST /v3/players takes in one go
 const BATCH_DELAY_MS = 120; 
@@ -18,10 +16,8 @@ const INITIAL_DUMP_MS = 5_000;
 const JOIN_BATCH_MAX = 8;
 
 const TAG_PRIORITY = 100; 
-const SERAPH_PRIORITY = 99; 
 
 // how a tag urchin tag is drawn
-// seraph does not have specific tags, as the api returns with a color to use
 const STYLES: Record<string, StyleConfig> = {
     confirmed_cheater: { label: "CHEATER", short: "C", color: "dark_red" },
     suspected_cheater: { label: "SUS", short: "S", color: "red" },
@@ -32,14 +28,6 @@ const STYLES: Record<string, StyleConfig> = {
 };
 
 const FALLBACK_COLOR: McColorName = "red";
-
-// seraph status tags are not real tags, just to know if a report is confirmed or not
-const SERAPH_VERIFIED = "seraph.verified";
-const SERAPH_PENDING = "seraph.pending";
-const isSeraphStatus = (name: string): boolean => name === SERAPH_VERIFIED || name === SERAPH_PENDING;
-
-// every seraph tag_name is namespaced, ie. "seraph.closet_cheating"
-const stripNamespace = (name: string): string => name.replace(/^seraph\./i, "");
 
 interface StyleConfig {
     label?: string;
@@ -54,14 +42,6 @@ interface AlertConfig {
     repeatSeconds?: number;
 }
 
-interface SeraphConfig {
-    enabled?: boolean;
-    apiKey?: string;
-    baseUrl?: string;
-    scoreFactors?: string; // comma separated sniper score factors, passed through as ?score=
-    scoreThreshold?: number; // sniper score worth a tag of its own, 0 turns that off
-}
-
 interface UrchinConfig {
     enabled?: boolean;
     apiKey?: string;
@@ -72,7 +52,6 @@ interface UrchinConfig {
     types?: Record<string, StyleConfig>;
     alerts?: AlertConfig;
     disableInLobby?: boolean; // skip background lookups and alerts while in a lobby to save ratelimit
-    seraph?: SeraphConfig;
 }
 
 interface UrchinTag {
@@ -84,27 +63,9 @@ interface UrchinTag {
     expires_at?: number;
 }
 
-interface SeraphTag {
-    tag_name?: string; // the real name, ie. "seraph.closet_cheating"
-    text?: string; // the short form seraphs own tag column shows, ie. "CC"
-    tooltip?: string;
-    color?: number;
-    textColor?: number;
-    icon?: string;
-    alert?: boolean; 
-}
-
-interface SeraphResponse {
-    error?: string;
-    score?: { mode?: string; value?: number };
-    tags?: SeraphTag[];
-    timestamp?: string;
-}
-
 interface Hit {
-    source: "urchin" | "seraph";
+    source: "urchin";
     label: string;
-    note?: string; // extra tooltip line, ie. whether a seraph flag is confirmed yet
     short: string;
     color: McColorName;
     tooltip: string;
@@ -136,36 +97,10 @@ function formatDate(millis: number | undefined): string {
     return Number.isNaN(date.getTime()) ? "unknown" : date.toISOString().slice(0, 10);
 }
 
-function firstLine(tooltip: string | undefined): string {
-    return String(tooltip ?? "").split(/\r?\n/)[0].trim();
-}
-
-//seraph uses rgb colors 
-function nearestColor(rgb: number | undefined): McColorName | undefined {
-    if (typeof rgb !== "number" || !Number.isFinite(rgb)) return undefined;
-    const r = (rgb >> 16) & 0xff;
-    const g = (rgb >> 8) & 0xff;
-    const b = rgb & 0xff;
-
-    let best: McColorName | undefined;
-    let bestDistance = Infinity;
-    for (const [name, value] of Object.entries(COLOR_RGB) as [McColorName, number][]) {
-        const dr = r - ((value >> 16) & 0xff); // bit shifts cause we get a hex number rather than a color object, shifting positions out give us the r, g, b values
-        const dg = g - ((value >> 8) & 0xff);
-        const db = b - (value & 0xff);
-        const distance = dr * dr * 0.3 + dg * dg * 0.59 + db * db * 0.11; // wtf voodoo magic
-        if (distance < bestDistance) {
-            bestDistance = distance;
-            best = name;
-        }
-    }
-    return best;
-}
-
 export const urchinPlugin: Plugin = {
     name: "urchin",
-    version: "1.1.0",
-    description: "Urchin and Seraph blacklist tags on names, and a chat alert when a flagged player turns up.",
+    version: "1.2.0",
+    description: "Urchin blacklist tags on names, and a chat alert when a flagged player turns up.",
 
     defaultConfig: {
         enabled: true,
@@ -182,43 +117,27 @@ export const urchinPlugin: Plugin = {
             onLobby: true, 
             repeatSeconds: 300, 
         },
-        seraph: {
-            enabled: true,
-            apiKey: "", // seraph key
-            baseUrl: SERAPH_BASE,
-            scoreFactors: "", 
-            scoreThreshold: 0, 
-        },
     },
 
     setup(api) {
         const config = api.pluginConfig as UrchinConfig;
-        const seraphConfig = config.seraph ?? {};
 
-        if (!config.apiKey && !(seraphConfig.enabled && seraphConfig.apiKey)) {
-            api.log.warn(
-                "no api keys set, blacklist tags are off (builtInPlugins.urchin.apiKey and/or builtInPlugins.urchin.seraph.apiKey)",
-            );
+        if (!config.apiKey) {
+            api.log.warn("no api key set, blacklist tags are off (builtInPlugins.urchin.apiKey)");
             return;
         }
 
         const urchinBase = String(config.baseUrl || URCHIN_BASE).replace(/\/+$/, "");
-        const seraphBase = String(seraphConfig.baseUrl || SERAPH_BASE).replace(/\/+$/, "");
         const ttl = Math.max(0, Number(config.cacheTtlSeconds ?? 600)) * 1000;
         const timeout = Number(config.timeoutMs ?? 6000);
         const ignored = new Set((config.ignoreTypes ?? []).map((type) => String(type).toLowerCase()));
         const styles: Record<string, StyleConfig> = { ...STYLES, ...(config.types ?? {}) };
         const alerts = { enabled: true, onJoin: true, onLobby: true, repeatSeconds: 300, ...(config.alerts ?? {}) };
         const repeatMs = Math.max(0, Number(alerts.repeatSeconds ?? 300)) * 1000;
-        const scoreFactors = String(seraphConfig.scoreFactors ?? "").trim();
-        const scoreThreshold = Number(seraphConfig.scoreThreshold ?? 0);
         const commandPrefix = api.config.commandPrefix;
 
-
-
         const urchin: SourceState = { name: "urchin", disabled: !config.apiKey, cooldownUntil: 0 };
-        const seraph: SourceState = { name: "seraph", disabled: !(seraphConfig.enabled && seraphConfig.apiKey), cooldownUntil: 0 };
-        const anyLive = () => !urchin.disabled || !seraph.disabled;
+        const anyLive = () => !urchin.disabled;
 
         function checkFatal(source: SourceState, status: number): boolean {
             if (status !== 401 && status !== 403) return false;
@@ -378,42 +297,6 @@ export const urchinPlugin: Plugin = {
             return cached(`un:${player.name.toLowerCase()}`, () => lookupName(player.name));
         }
 
-        // seraph
-        // uses cubelify in documentation so thats what we used
-        async function lookupSeraph(uuid: string): Promise<SeraphResponse | null> {
-            const query = scoreFactors ? `?score=${encodeURIComponent(scoreFactors)}` : "";
-            const result = await request<SeraphResponse>(
-                seraph,
-                "GET",
-                `${seraphBase}/${uuid}/cubelify/blacklist${query}`,
-                { "seraph-api-key": seraphConfig.apiKey ?? "" },
-            );
-            if (result.fatal) return null;
-            if (result.status === 400 || result.status === 404) return null; 
-            if (!result.ok) throw new Error(`seraph lookup failed with ${result.status}`);
-            // seraph can return 200s with an error (TERRIBLE API DESIGN)
-            if (result.data?.error) {
-                api.log.debug(`seraph returned an error for ${uuid}: ${result.data.error}`);
-                return null;
-            }
-            return result.data;
-        }
-
-        // seraph is keyed by uuid only, so a name-only detection has to go through mojang
-        // (unless we grab uuid directly from the server)
-        function seraphFor(player: PlayerRef): Promise<SeraphResponse | null> {
-            if (seraph.disabled) return Promise.resolve(null);
-            const known = player.uuid ? stripDashes(player.uuid) : undefined;
-            if (known && known.length === 32 && isFakeUuid(known)) return Promise.resolve(null); // nicked or npc
-
-            const key = known ? `s:${known}` : `sn:${player.name.toLowerCase()}`;
-            return cached(key, async () => {
-                const uuid = known ?? (await resolveUuid(api.http, player.name).then((id) => (id ? stripDashes(id) : undefined)));
-                if (!uuid) return null;
-                return lookupSeraph(uuid);
-            });
-        }
-
         // tag styling
         function styleFor(type: string): { label: string; short: string; color: McColorName } {
             const style = styles[String(type).toLowerCase()] ?? {};
@@ -465,102 +348,8 @@ export const urchinPlugin: Plugin = {
             });
         }
 
-        // create note for seraph.verified / seraph.pending
-        function seraphStatusNote(tags: SeraphTag[]): string | undefined {
-            let note: string | undefined;
-            for (const tag of tags) {
-                const name = String(tag.tag_name ?? "").trim().toLowerCase();
-                if (!isSeraphStatus(name)) continue;
-
-                const verified = name === SERAPH_VERIFIED;
-                const color = nearestColor(tag.color) ?? nearestColor(tag.textColor) ?? (verified ? "green" : "yellow");
-                const label = firstLine(tag.text) || firstLine(tag.tooltip) || (verified ? "verified" : "pending verification");
-                const detail = firstLine(tag.tooltip);
-                note =
-                    COLOR_CODES[color] +
-                    label +
-                    (detail && detail.toLowerCase() !== label.toLowerCase() ? ` §8- ${detail}` : "");
-                if (verified) break; // if both somehow turn up, confirmed is the one that matters
-            }
-            return note;
-        }
-
-        function seraphTagHits(report: SeraphResponse | null): Hit[] {
-            if (!report) return [];
-            const hits: Hit[] = [];
-            const note = seraphStatusNote(report.tags ?? []);
-
-            for (const tag of report.tags ?? []) {
-                const raw = String(tag.tag_name ?? "").trim().toLowerCase();
-                if (isSeraphStatus(raw)) continue;
-                const name = stripNamespace(raw) || firstLine(tag.text);
-                if (!name) continue;
-                if (ignored.has(name) || ignored.has(raw)) continue;
-
-                // seraph sends its own 2c short form in the text field, but we dont want to use that for the nametag short, as it can be longer than 4 chars and look bad
-                const label = titleCase(name);
-                const short = firstLine(tag.text) || (label.length <= 4 ? label : initials(label));
-                const tooltip = [
-                    `§f${label}`,
-                    `§7${String(tag.tooltip ?? "").trim() || "no detail given"}`,
-                    note,
-                    "§8via seraph",
-                ]
-                    .filter((line): line is string => Boolean(line))
-                    .join("\n");
-
-                hits.push({
-                    source: "seraph",
-                    label,
-                    note,
-                    short,
-                    color: nearestColor(tag.color) ?? nearestColor(tag.textColor) ?? FALLBACK_COLOR,
-                    tooltip,
-                    priority: SERAPH_PRIORITY, 
-                    alertable: tag.alert !== false,
-                });
-            }
-
-            return hits;
-        }
-
-        // sniper isnt a flag here its a number so we only give it a tag if its above the threshold, and we dont want to show it if the score is missing or invalid
-        function seraphScoreHit(report: SeraphResponse | null): Hit | null {
-            const score = report?.score;
-            if (scoreThreshold <= 0 || typeof score?.value !== "number") return null;
-            if (score.value < scoreThreshold) return null;
-            return {
-                source: "seraph",
-                label: `SNIPER ${Math.round(score.value * 100) / 100}`,
-                short: "SS",
-                color: "gold",
-                tooltip: [
-                    "§fSniper score",
-                    `§7${score.value} §8(mode: ${score.mode || "default"})`,
-                    `§8flags at ${scoreThreshold}, via seraph`,
-                ].join("\n"),
-                priority: SERAPH_PRIORITY,
-                alertable: true,
-            };
-        }
-
-        function seraphHits(report: SeraphResponse | null): Hit[] {
-            const score = seraphScoreHit(report);
-            return score ? [...seraphTagHits(report), score] : seraphTagHits(report);
-        }
-
-        // hit both proviers for one source but dont throw unless both fail, and combine the results
         async function hitsFor(player: PlayerRef): Promise<Hit[]> {
-            const [urchinResult, seraphResult] = await Promise.allSettled([urchinTagsFor(player), seraphFor(player)]);
-
-            const hits: Hit[] = [];
-            if (urchinResult.status === "fulfilled") hits.push(...urchinHits(urchinResult.value));
-            if (seraphResult.status === "fulfilled") hits.push(...seraphHits(seraphResult.value));
-            if (hits.length > 0) return hits;
-
-            const failure = [urchinResult, seraphResult].find((result) => result.status === "rejected");
-            if (failure && failure.status === "rejected") throw failure.reason;
-            return hits;
+            return urchinHits(await urchinTagsFor(player));
         }
 
         api.registerEnricher({
@@ -709,7 +498,7 @@ export const urchinPlugin: Plugin = {
             "urchin",
             async (args, session) => {
                 if (!anyLive()) {
-                    session.chat.text(`${PREFIX} §cBlacklist lookups are off, both api keys were rejected.`);
+                    session.chat.text(`${PREFIX} §cBlacklist lookups are off, the api key was rejected.`);
                     return;
                 }
                 const player = target(args, session);
@@ -724,53 +513,16 @@ export const urchinPlugin: Plugin = {
                     session.chat.text(`${PREFIX} §f${player.name} §8- ${heading}`);
                     for (const hit of hits) {
                         const reason = hit.tooltip.split("\n")[1] ?? "§7no detail given";
-                        const note = hit.note ? ` §8[${hit.note}§8]` : "";
-                        session.chat.text(`  §8• ${COLOR_CODES[hit.color]}${hit.label} §8- ${reason}${note} §8(${hit.source})`);
+                        session.chat.text(`  §8• ${COLOR_CODES[hit.color]}${hit.label} §8- ${reason} §8(${hit.source})`);
                     }
                 } catch (error) {
                     session.chat.text(`${PREFIX} §cBlacklist lookup failed: §7${error}`);
                 }
             },
-            "look a player up on the Urchin and Seraph blacklists",
+            "look a player up on the Urchin blacklist",
         );
 
-        api.registerCommand(
-            "seraph",
-            async (args, session) => {
-                if (seraph.disabled) {
-                    session.chat.text(`${PREFIX} §cSeraph is off (no key, disabled, or the key was rejected).`);
-                    return;
-                }
-                const player = target(args, session);
-                session.chat.text(`${PREFIX} §7Looking up §f${player.name} §7on Seraph...`);
-                try {
-                    const report = await seraphFor(player);
-                    const score = report?.score;
-                    const hits = seraphTagHits(report);
-
-                    if (hits.length === 0) {
-                        session.chat.text(`${PREFIX} §f${player.name} §ahas no Seraph tags.`);
-                    } else {
-                        const heading = hits.map((hit) => COLOR_CODES[hit.color] + hit.label).join("§7, ");
-                        session.chat.text(`${PREFIX} §f${player.name} §8- ${heading}`);
-                        for (const hit of hits) {
-                            const note = hit.note ? ` §8[${hit.note}§8]` : "";
-                            session.chat.text(
-                                `  §8• ${COLOR_CODES[hit.color]}${hit.label} §8- ${hit.tooltip.split("\n")[1] ?? "§7no detail given"}${note}`,
-                            );
-                        }
-                    }
-                    if (typeof score?.value === "number") {
-                        session.chat.text(`  §7Sniper score: §f${score.value} §8(${score.mode || "default"})`);
-                    }
-                } catch (error) {
-                    session.chat.text(`${PREFIX} §cSeraph lookup failed: §7${error}`);
-                }
-            },
-            "look a player up on Seraph, tags and sniper score",
-        );
-
-        const live = [urchin, seraph].filter((source) => !source.disabled).map((source) => source.name);
+        const live = [urchin].filter((source) => !source.disabled).map((source) => source.name);
         api.log.info(
             `blacklist tags active via ${live.join(" + ")} (alerts: ${alerts.enabled ? "on" : "off"}, lobbies: ${config.disableInLobby ? "off" : "on"}, cache ${ttl / 1000}s)`,
         );
