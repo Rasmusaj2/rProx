@@ -122,8 +122,13 @@ export function createCoreCommandsPlugin(
                         }
 
                         if (rest.length === 0) {
-                            editor.open(session, isBranch(api.config, path) ? path : path.slice(0, -1));
-                            editor.show(session, path);
+                            // a block opens into the menu, a plain value asks for a new value
+                            if (isBranch(api.config, path)) {
+                                editor.open(session, path);
+                                editor.show(session, path);
+                            } else {
+                                editor.prompt(session, path);
+                            }
                             return;
                         }
                         editor.assign(session, path, rest.join(" "));

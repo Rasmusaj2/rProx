@@ -1,4 +1,4 @@
-import { PREFIX } from "../core/chat";
+import { PREFIX, component, type ChatPart } from "../core/chat";
 import { isFakeUuid } from "../core/lobby";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
 import {
@@ -150,6 +150,29 @@ export const hypixelStatsPlugin: Plugin = {
         }
 
         let warnedInvalidKey = false;
+        const warnedSessions = new Set<string>();
+
+        // key rejected (most likely expired from dev keys)
+        const alertInvalidKey = (session: Session): void => {
+            const parts: ChatPart[] = [
+                { text: `${PREFIX} §4Your Hypixel API key is invalid. 
+                §7§oYou can create a new one at developer.hypixel.net.` },
+            ];
+            if (api.config.proxy.allowIngameEditing) {
+                parts.push({
+                    text: " [Set a new key]",
+                    color: "aqua",
+                    bold: true,
+                    runCommand: `${api.config.commandPrefix}config builtInPlugins.hypixelStats.apiKey`,
+                    tooltip: "§7Set §fbuiltInPlugins.hypixelStats.apiKey\n§8Create a key at developer.hypixel.net",
+                });
+            } else {
+                parts.push({ text: " §7Set §fbuiltInPlugins.hypixelStats.apiKey §7in config.json." });
+            }
+            session.chat.raw(component(parts));
+        };
+
+        api.on("sessionEnd", (session) => warnedSessions.delete(session.id));
 
         // the api only takes uuids, /who and chat detections only give us names
         // fake uuid is from mythical kits, so resolve the proper uuid
@@ -161,11 +184,17 @@ export const hypixelStatsPlugin: Plugin = {
 
         // essential means somebody typed a command for this one, so it may spend the
         // slice of the ratelimit window that background decoration is kept out of
-        const fetch = async (player: PlayerRef, options: { essential?: boolean } = {}) => {
+        const fetch = async (player: PlayerRef, options: { essential?: boolean } = {}, session?: Session) => {
             const result = await hypixel.fetchPlayer(await withUuid(player), options);
-            if (result.status === "invalid_key" && !warnedInvalidKey) {
-                warnedInvalidKey = true;
-                api.log.warn("Hypixel API key is invalid, stats stay off until its fixed (developer.hypixel.net)");
+            if (result.status === "invalid_key") {
+                if (!warnedInvalidKey) {
+                    warnedInvalidKey = true;
+                    api.log.warn("Hypixel API key is invalid, stats stay off until its fixed (developer.hypixel.net)");
+                }
+                if (session && !warnedSessions.has(session.id)) {
+                    warnedSessions.add(session.id);
+                    alertInvalidKey(session);
+                }
             }
             return result;
         };
@@ -176,14 +205,14 @@ export const hypixelStatsPlugin: Plugin = {
 
         api.registerEnricher({
             name: "hypixelStats",
-            async enrich(player) {
+            async enrich(player, ctx) {
                 if (player.uuid && isFakeUuid(player.uuid)) {
                     // a fake uuid can be given to a real player *if* they're using a custom skin, ie. end lord in skywars
                     const real = await resolveUuid(api.http, player.name);
                     if (!real) return tags.nickTags("via tab list uuid"); // no account, nicked
                     player = { ...player, uuid: real };
                 }
-                const result = await fetch(player);
+                const result = await fetch(player, {}, ctx.session);
                 if (result.status !== "ok") {
                     if (RETRYABLE.includes(result.status)) throw new Error(fetchErrorMessage(result.status));
                     if (result.status === "no_data") return tags.nickTags("via Hypixel API"); // apply nick tag when no data available, ie. uuid doesnt exist on hypixel api - shouldnt usually be hit since it'll be detected via uuid check
@@ -201,7 +230,7 @@ export const hypixelStatsPlugin: Plugin = {
             const target: PlayerRef = args[0]
                 ? (session.findPlayer(args[0]) ?? { name: args[0] })
                 : { name: session.username };
-            const result = await fetch(target, { essential: true });
+            const result = await fetch(target, { essential: true }, session);
             if (result.status !== "ok") {
                 session.chat.text(`${PREFIX} §c${fetchErrorMessage(result.status)} §7(${target.name})`);
                 return null;

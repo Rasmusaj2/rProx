@@ -29,6 +29,7 @@ export interface ConfigEditor {
     open(session: Session, path?: string[], page?: number): void;
     show(session: Session, path: string[]): void;
     assign(session: Session, path: string[], raw: string): void;
+    prompt(session: Session, path: string[]): void; // close the menu and ask for a new value in chat
     takeChat(session: Session, message: string): boolean; // if currently editing take chat line
     editing(session: Session): boolean;
     cancel(session: Session): boolean;
@@ -495,6 +496,7 @@ export function createConfigEditor({ config, prefix, log, guard, onSet }: Config
         open,
         show,
         assign,
+        prompt: (session, path) => promptFor(session, path),
         takeChat,
         editing: (session) => Boolean(sessions.get(session.id)?.pending),
         cancel: (session) => {
