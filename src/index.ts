@@ -2,6 +2,7 @@
 import { configExists, loadConfig, saveConfig } from "./config";
 import { createLogger } from "./util/log";
 import { HttpClient } from "./util/http";
+import { checkForUpdate } from "./util/updateCheck";
 import { EventBus } from "./core/events";
 import { EnrichmentEngine } from "./core/enrichment";
 import { PluginManager } from "./core/pluginManager";
@@ -57,15 +58,24 @@ async function main(): Promise<void> {
     log.info(`${plugins.loadedNames.length} plugins, ${enrichment.count} enrichers active`);
 
     // say hello once per session so its obvious the proxy is in the loop
+    let updateNotice: string | undefined;
     const greeted = new Set<string>();
     bus.on("chat", (_msg, session) => {
         if (greeted.has(session.id)) return;
         greeted.add(session.id);
         session.chat.text(`${PREFIX} §aactive §7- type §f${config.commandPrefix}help §7for commands`);
+        if (updateNotice) session.chat.text(updateNotice);
     });
     bus.on("sessionEnd", (session) => greeted.delete(session.id));
 
     new ProxyServer(config, bus, enrichment, plugins).start();
+
+    // a heads up only, nothing is downloaded or replaced
+    void checkForUpdate().then((update) => {
+        if (!update) return;
+        updateNotice = `${PREFIX} §eA newer rProx is available: §fv${update.latest} §7(you have §fv${update.current}§7) §8- §f${update.url}`;
+        log.warn(`newer rProx release available: v${update.latest} (running v${update.current}) - ${update.url}`);
+    });
 }
 
 main().catch((error) => {
