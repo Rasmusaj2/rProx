@@ -72,14 +72,14 @@ export const partyTeamsPlugin: Plugin = {
 
     setup(api) {
         const config = api.pluginConfig as PartyTeamsConfig;
-        const apiKey = apiKeyOf(api, config);
-        if (!apiKey) {
-            api.log.warn("no apiKey found, partyTeams is off (set builtInPlugins.hypixelStats.apiKey)");
-            return;
+
+        // avoid restart
+        const hypixel = () => getHypixelService(api.http, apiKeyOf(api, config));
+
+        if (!hypixel().enabled) {
+            api.log.warn("no apiKey found, partyTeams is off until one is set (set builtInPlugins.hypixelStats.apiKey)");
         }
 
-        // shared instance, the ttl and ratelimit state live on hypixelStats copy
-        const hypixel = getHypixelService(api.http, apiKey);
         const sessions = new Map<string, SessionState>();
 
         const stateFor = (session: Session): SessionState => {
@@ -167,7 +167,7 @@ export const partyTeamsPlugin: Plugin = {
                 uuid = real;
                 state.uuids.set(key, uuid);
             }
-            const result = await hypixel.fetchPlayer({ name, uuid });
+            const result = await hypixel().fetchPlayer({ name, uuid });
             if (result.status === "no_data") return { nick: true };
             if (result.status !== "ok") {
                 api.log.debug(`partyTeams lookup for ${name} failed: ${result.status}`);
@@ -197,6 +197,7 @@ export const partyTeamsPlugin: Plugin = {
         };
 
         const announce = async (session: Session, state: SessionState): Promise<void> => {
+            if (!hypixel().enabled) return; // no key yet
             api.log.debug(`partyTeams announce for ${session.username}'s session, ${state.teams.size} scoreboard teams`);
             const teams = gameTeams(state);
             if (teams.size === 0) {

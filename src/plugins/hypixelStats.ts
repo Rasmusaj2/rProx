@@ -141,15 +141,17 @@ export const hypixelStatsPlugin: Plugin = {
 
     setup(api) {
         const config = api.pluginConfig as HypixelStatsConfig;
-        const ttl = (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000;
-        const hypixel = getHypixelService(api.http, config.apiKey ?? "", ttl); // shared instance, see getHypixelService
 
-        if (!hypixel.enabled) {
-            api.log.warn("no apiKey set, hypixelStats is off (set builtInPlugins.hypixelStats.apiKey)");
-            return;
+        // avoid restart
+        const service = () =>
+            getHypixelService(api.http, config.apiKey ?? "", (config.cacheTtlSeconds ?? DEFAULT_CACHE_SECONDS) * 1000);
+
+        if (!service().enabled) {
+            api.log.warn("no apiKey set, hypixelStats is off until one is set (set builtInPlugins.hypixelStats.apiKey)");
         }
 
         let warnedInvalidKey = false;
+        let activeKey = config.apiKey ?? "";
         const warnedSessions = new Set<string>();
 
         // key rejected (most likely expired from dev keys)
@@ -185,7 +187,14 @@ export const hypixelStatsPlugin: Plugin = {
         // essential means somebody typed a command for this one, so it may spend the
         // slice of the ratelimit window that background decoration is kept out of
         const fetch = async (player: PlayerRef, options: { essential?: boolean } = {}, session?: Session) => {
-            const result = await hypixel.fetchPlayer(await withUuid(player), options);
+            const key = config.apiKey ?? "";
+            if (key !== activeKey) {
+                // a fresh key was set, let it warn on its own if it turns out bad
+                activeKey = key;
+                warnedInvalidKey = false;
+                warnedSessions.clear();
+            }
+            const result = await service().fetchPlayer(await withUuid(player), options);
             if (result.status === "invalid_key") {
                 if (!warnedInvalidKey) {
                     warnedInvalidKey = true;
@@ -246,6 +255,7 @@ export const hypixelStatsPlugin: Plugin = {
         const generalExtras = async (player: HypixelPlayer) => {
             const dashed = player.uuid ? dashUuid(player.uuid) : undefined;
             if (!dashed) return undefined;
+            const hypixel = service();
             const [gexp, recent] = await Promise.all([hypixel.guildExp(dashed), hypixel.recentGames(dashed)]);
             return { gexp, recent };
         };

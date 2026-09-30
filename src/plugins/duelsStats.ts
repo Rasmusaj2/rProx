@@ -101,14 +101,17 @@ export const duelsStatsPlugin: Plugin = {
 
     setup(api) {
         const config = api.pluginConfig as DuelsStatsConfig;
-        const apiKey = config.apiKey || (api.config.builtInPlugins?.hypixelStats as { apiKey?: string } | undefined)?.apiKey || "";
-        if (!apiKey) {
-            api.log.warn("no apiKey found, duelsStats is off (set builtInPlugins.hypixelStats.apiKey)");
-            return;
+
+        // avoid restart
+        const hypixel = () => {
+            const apiKey = config.apiKey || (api.config.builtInPlugins?.hypixelStats as { apiKey?: string } | undefined)?.apiKey || "";
+            return getHypixelService(api.http, apiKey);
+        };
+
+        if (!hypixel().enabled) {
+            api.log.warn("no apiKey found, duelsStats is off until one is set (set builtInPlugins.hypixelStats.apiKey)");
         }
 
-        // shared instance, the ttl and ratelimit state live on hypixelStats copy
-        const hypixel = getHypixelService(api.http, apiKey);
         const sessions = new Map<string, SessionState>();
 
         const stateFor = (session: Session): SessionState => {
@@ -363,7 +366,7 @@ export const duelsStatsPlugin: Plugin = {
                 nick(session, name);
                 return;
             }
-            const result = await hypixel.fetchPlayer(player);
+            const result = await hypixel().fetchPlayer(player);
             if (result.status === "no_data") {
                 nick(session, name);
                 return;
@@ -387,6 +390,7 @@ export const duelsStatsPlugin: Plugin = {
 
         const announce = async (session: Session, state: SessionState): Promise<void> => {
             if (sessions.get(session.id) !== state) return;
+            if (!hypixel().enabled) return; // no key yet
             if (!inDuels(session, state)) return;
             const pending = [...state.enemies.values()].filter((name) => !state.announced.has(name.toLowerCase()));
             if (pending.length === 0) return;
