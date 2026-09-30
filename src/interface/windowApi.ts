@@ -792,7 +792,12 @@ class WindowApiImpl implements WindowApi {
                 case "close_window": {
                     const id = Number(data.windowId);
                     const chest = this.chests.get(id);
-                    if (!chest) return false;
+                    if (!chest) {
+                        // the client closed one of hypixels windows, so we need to forget about this state
+                        // otherwise it instantly closes the next custom window (ie. //config) because it thinks its still open
+                        this.injector.forgetServer(id);
+                        return false;
+                    }
                     this.chests.delete(id);
                     chest.kill("client");
                     return true;
