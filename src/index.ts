@@ -7,7 +7,7 @@ import { EventBus } from "./core/events";
 import { EnrichmentEngine } from "./core/enrichment";
 import { PluginManager } from "./core/pluginManager";
 import { ProxyServer } from "./proxy/server";
-import { PREFIX } from "./core/chat";
+import { PREFIX, component } from "./core/chat";
 import { runOnboarding } from "./onboarding";
 
 import { createCoreCommandsPlugin } from "./plugins/core";
@@ -58,13 +58,13 @@ async function main(): Promise<void> {
     log.info(`${plugins.loadedNames.length} plugins, ${enrichment.count} enrichers active`);
 
     // say hello once per session so its obvious the proxy is in the loop
-    let updateNotice: string | undefined;
+    let updateNotice: Record<string, unknown> | undefined;
     const greeted = new Set<string>();
     bus.on("chat", (_msg, session) => {
         if (greeted.has(session.id)) return;
         greeted.add(session.id);
         session.chat.text(`${PREFIX} §aactive §7- type §f${config.commandPrefix}help §7for commands`);
-        if (updateNotice) session.chat.text(updateNotice);
+        if (updateNotice) session.chat.raw(updateNotice);
     });
     bus.on("sessionEnd", (session) => greeted.delete(session.id));
 
@@ -73,7 +73,18 @@ async function main(): Promise<void> {
     // a heads up only, nothing is downloaded or replaced
     void checkForUpdate().then((update) => {
         if (!update) return;
-        updateNotice = `${PREFIX} §eA newer rProx is available: §fv${update.latest} §7(you have §fv${update.current}§7) §8- §f${update.url}`;
+        updateNotice = component([
+            { text: `${PREFIX} §eA newer rProx is available: ` },
+            { text: `v${update.latest}`, color: "yellow", bold: true },
+            { text: ` §7(you have §fv${update.current}§7) §8- ` },
+            {
+                text: update.url.replace(/^https?:\/\//, ""),
+                color: "aqua",
+                underlined: true,
+                openUrl: update.url,
+                tooltip: "§7Open the release page",
+            },
+        ]);
         log.warn(`newer rProx release available: v${update.latest} (running v${update.current}) - ${update.url}`);
     });
 }
