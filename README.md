@@ -16,12 +16,26 @@ npm start
 
 After this rProx will be running on localhost:25565
 
-On first boot, rProx creates a config.json file. Close rProx, and edit the config file.
+### First-run onboarding
+
+On first boot (when no `config.json` exists yet), rProx launches an interactive
+console setup guide that walks you through:
+
+1. **API keys** — your Hypixel and Urchin API keys. Press Enter to skip any you
+   do not have yet, and add them later.
+2. **Microsoft account** — sign in once with the device code it shows, and the
+   account is remembered for next time.
+3. **Plugins** — turn built-in plugins on/off and edit their settings with the
+   arrow keys (`Enter` toggles, right arrow opens settings, `q` finishes).
+
+Everything entered here is written to `config.json`, and can be changed later by
+opening `//config` ingame or editing the file directly.
 > **Note:** Using //config, it is also possible to modify some configuration settings ingame.
 
-Here it is recommended to set your Hypixel and Urchin API Keys.
+The guide only runs on a fresh install when the terminal supports input. To see
+it again, delete or rename `config.json`.
 
-After the config is edited, reopen rProx, connect to `127.0.0.1:25565` on Minecraft, and [`link`](https://microsoft.com/link) your Microsoft account.
+Once setup is done, connect to `127.0.0.1:25565` on Minecraft and [`link`](https://microsoft.com/link) your Microsoft account.
 
 New settings are automatically filled into your config from new updates or plugins.
 
