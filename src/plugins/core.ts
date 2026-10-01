@@ -141,7 +141,13 @@ export function createCoreCommandsPlugin(
                     if (name !== "chat" || typeof data?.message !== "string") return;
                     return editor.takeChat(session, data.message);
                 });
-            api.on("sessionEnd", (session) => editor.forget(session.id));
+
+                api.on("sessionEnd", (session) => editor.forget(session.id));
+                
+                // moved server, abandon config edit statew
+                api.on("serverPacket", (name, _data, session) => {
+                    if (name === "login") editor.abandon(session);
+                });
             }
         },
     };

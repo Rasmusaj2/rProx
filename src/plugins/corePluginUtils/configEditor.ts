@@ -9,6 +9,8 @@ import type { Logger } from "../../util/log";
 const HEADER_SLOT = 4; // top middle, above the 4x7 block
 const PER_PAGE = CONTENT_SLOTS.length; // 28
 
+const PROMPT_TIMEOUT_MS = 30_000;
+
 // what the editor thinks a value is, which is all the typing it needs
 type Kind = "object" | "array" | "boolean" | "number" | "string" | "null";
 
@@ -23,6 +25,7 @@ interface EditorState {
     page: number;
     menu?: Menu;
     pending?: Pending;
+    timer?: NodeJS.Timeout;
 }
 
 export interface ConfigEditor {
@@ -33,6 +36,7 @@ export interface ConfigEditor {
     takeChat(session: Session, message: string): boolean; // if currently editing take chat line
     editing(session: Session): boolean;
     cancel(session: Session): boolean;
+    abandon(session: Session): boolean; // drop a pending edit without reopening the menu (server move)
     forget(sessionId: string): void;
     dispose(): void; // close every open menu, for when the plugin owning the editor is unloaded
 }
@@ -173,6 +177,20 @@ export function createConfigEditor({ config, prefix, log, guard, onSet }: Config
         return state;
     }
 
+    // drop pending edit if they take too long
+    function clearPendingTimer(state: EditorState): void {
+        if (!state.timer) return;
+        clearTimeout(state.timer);
+        state.timer = undefined;
+    }
+
+    function dropPending(state: EditorState): Pending | undefined {
+        clearPendingTimer(state);
+        const pending = state.pending;
+        state.pending = undefined;
+        return pending;
+    }
+
     function entries(session: Session): MenuEntry[] {
         const state = stateFor(session);
         const node = valueAt(config, state.path);
@@ -256,7 +274,7 @@ export function createConfigEditor({ config, prefix, log, guard, onSet }: Config
 
     function open(session: Session, path?: string[], page?: number): void {
         const state = stateFor(session);
-        state.pending = undefined;
+        dropPending(state);
         if (path) state.path = path;
         if (page !== undefined) state.page = page;
 
@@ -303,9 +321,17 @@ export function createConfigEditor({ config, prefix, log, guard, onSet }: Config
     function promptFor(session: Session, path: string[]): void {
         const state = stateFor(session);
         const current = valueAt(config, path);
+        clearPendingTimer(state);
         state.pending = { path, back: path.slice(0, -1), page: state.menu?.page ?? state.page };
         state.page = state.pending.page;
         state.menu?.close();
+        // without deadline the player could leave the prompt sitting accidentally and forget and eventually replace
+        state.timer = setTimeout(() => {
+            const pending = dropPending(state);
+            if (!pending) return;
+            session.chat.text(`${PREFIX} §7Left §f${dotted(pending.path)} §7alone. §8(timed out)`);
+        }, PROMPT_TIMEOUT_MS);
+        state.timer.unref?.();
 
         session.chat.text(`${PREFIX} §7Editing §f${dotted(path)}`);
         session.chat.text(`  §7Current §8(${kindOf(current)})§7: ${previewFor(path[path.length - 1], current)}`);
@@ -430,9 +456,8 @@ export function createConfigEditor({ config, prefix, log, guard, onSet }: Config
 
     function takeChat(session: Session, message: string): boolean {
         const state = sessions.get(session.id);
-        const pending = state?.pending;
-        if (!state || !pending) return false;
-        state.pending = undefined;
+        if (!state?.pending) return false;
+        const pending = dropPending(state)!;
 
         const trimmed = message.trim();
         if (trimmed.toLowerCase() === "cancel") {
@@ -502,18 +527,31 @@ export function createConfigEditor({ config, prefix, log, guard, onSet }: Config
         cancel: (session) => {
             const state = sessions.get(session.id);
             if (!state?.pending) return false;
-            const pending = state.pending;
-            state.pending = undefined;
+            const pending = dropPending(state)!;
             session.chat.text(`${PREFIX} §7Left §f${dotted(pending.path)} §7alone.`);
             open(session, pending.back, pending.page);
             return true;
         },
+        abandon: (session) => {
+            const state = sessions.get(session.id);
+            if (!state?.pending) return false;
+            const pending = dropPending(state)!;
+            // server moved, let player known
+            session.chat.text(`${PREFIX} §7Left §f${dotted(pending.path)} §7alone. §8(changed servers)`);
+            return true;
+        },
         forget: (id) => {
-            sessions.get(id)?.menu?.close();
+            const state = sessions.get(id);
+            if (!state) return;
+            clearPendingTimer(state);
+            state.menu?.close();
             sessions.delete(id);
         },
         dispose: () => {
-            for (const state of sessions.values()) state.menu?.close();
+            for (const state of sessions.values()) {
+                clearPendingTimer(state);
+                state.menu?.close();
+            }
             sessions.clear();
         },
     };
