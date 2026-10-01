@@ -276,9 +276,13 @@ export class ProxyServer {
         };
 
         // hypixel to client: forward packets, intercept for anything we need to handle or react to
+        let withholdRaw = false;
         target.on("raw", (buffer: Buffer, meta: { name: string; state: string }) => {
+            const withhold = withholdRaw; // need to withhold the raw packet if a plugin swallowed, but still needs to be handled for events
+            withholdRaw = false;
             // chat is the one packet we do not blind-forward, see below
             if (meta.name === "chat") return;
+            if (withhold) return;
             if (meta.state === states.PLAY && client.state === states.PLAY) client.writeRaw(buffer);
             if (meta.state === states.PLAY) title.flush();
         });
@@ -296,6 +300,7 @@ export class ProxyServer {
                 // windows before the event, so a plugin reading session.windows in
                 // a serverPacket handler is looking at the current state
                 windows.handleServerPacket(meta.name, data);
+                withholdRaw = windows.withholdsServerPacket(meta.name);
                 title.handlePacket(meta.name, data);
                 this.bus.emit("serverPacket", meta.name, data, session);
             } catch (error) {

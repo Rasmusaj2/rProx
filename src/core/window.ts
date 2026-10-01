@@ -435,10 +435,9 @@ export class WindowInjector {
         window.slots[slot] = data.item ?? null;
     }
 
-    // clientbound close
-    applyServerClose(windowId: number): number[] {
+//client bound close, ours are deliberately closed by us, so dont mirror this
+    applyServerClose(windowId: number): void {
         this.server.delete(windowId);
-        return this.forgetAllOurs();
     }
 
     // we told hypixel to close one of theirs, so stop mirroring it

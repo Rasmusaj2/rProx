@@ -8,6 +8,7 @@
 //
 // PLUMBING
 // WindowApi.handleServerPacket(name, data) - feed every server packet through here, returns whether it was one we care about
+// WindowApi.withholdsServerPacket(name) - true means this packet must NOT be forwarded to the client (ie. a close_window that would shut our screen)
 // WindowApi.handleClientPacket(name, data) - feed every client packet through here BEFORE forwarding it. true means it was for a window of ours and must not go upstream
 // WindowApi.dispose() - drop every window and rule, for session end
 //
@@ -693,6 +694,7 @@ class ServerWindowView implements ServerWindow {
 // api interface
 export interface WindowApi {
     handleServerPacket(name: string, data: any): boolean;
+    withholdsServerPacket(name: string): boolean; // iinbound packet that cant reach the client as it would close our window
     handleClientPacket(name: string, data: any): boolean;
     dispose(): void;
 
@@ -762,10 +764,7 @@ class WindowApiImpl implements WindowApi {
                     if (data.windowId !== PLAYER_WINDOW) this.queueRewrite(data.windowId);
                     return true;
                 case "close_window":
-                    for (const id of this.injector.applyServerClose(data.windowId)) {
-                        this.chests.get(id)?.kill("displaced");
-                        this.chests.delete(id);
-                    }
+                    this.injector.applyServerClose(data.windowId);
                     return true;
                 case "login":
                     this.closeAll();
@@ -777,6 +776,10 @@ class WindowApiImpl implements WindowApi {
             this.fail(error);
             return true;
         }
+    }
+
+    withholdsServerPacket(name: string): boolean {
+        return name === "close_window" && this.current() !== undefined;
     }
 
     // true means it was for a window of ours and must not get sent to hypixel
