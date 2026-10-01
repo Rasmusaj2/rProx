@@ -33,7 +33,8 @@
         "hypixelStats": {
             "enabled": true,
             "apiKey": "",
-            "cacheTtlSeconds": 300
+            "cacheTtlSeconds": 300,
+            "mentionStats": true
         },
         "nametagStats": {
             "enabled": true,

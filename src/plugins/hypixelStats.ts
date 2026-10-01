@@ -1,4 +1,5 @@
-import { PREFIX, component, type ChatPart } from "../core/chat";
+import { PREFIX, component, parsePlayerChat, renderPlayerLine, type ChatPart } from "../core/chat";
+import { tagsForGame } from "../core/game";
 import { isFakeUuid } from "../core/lobby";
 import type { Plugin, PlayerRef, Session, Tag } from "../core/types";
 import {
@@ -50,6 +51,11 @@ interface HypixelStatsConfig {
     enabled?: boolean;
     apiKey?: string;
     cacheTtlSeconds?: number;
+    mentionStats?: boolean; // show a speakers bedwars stats when they say your name in a bedwars lobby
+}
+
+function mentionsName(text: string, name: string): boolean {
+    return text.toLowerCase().split(/[^a-z0-9_]+/).includes(name.toLowerCase());
 }
 
 // autogenerates commands for every game based on tooltips from tags
@@ -137,6 +143,7 @@ export const hypixelStatsPlugin: Plugin = {
         enabled: true,
         apiKey: "",
         cacheTtlSeconds: DEFAULT_CACHE_SECONDS,
+        mentionStats: true,
     },
 
     setup(api) {
@@ -229,6 +236,37 @@ export const hypixelStatsPlugin: Plugin = {
                 }
                 return tags.allTags(result.player);
             },
+        });
+
+        // name said in chat, shhow bedwars stats
+        const MENTION_COOLDOWN_MS = 15_000;
+        const mentionSeen = new Map<string, number>();
+
+        api.on("sessionEnd", (session) => {
+            const scope = `${session.id}:`;
+            for (const key of mentionSeen.keys()) if (key.startsWith(scope)) mentionSeen.delete(key);
+        });
+
+        api.on("chat", (msg, session) => {
+            if (config.mentionStats === false) return;
+            if (session.game !== "bedwars" || !session.lobby) return;
+            const speaker = parsePlayerChat(msg.text);
+            if (!speaker || speaker.toLowerCase() === session.username.toLowerCase()) return;
+            if (!mentionsName(msg.text, session.username)) return;
+
+            const key = `${session.id}:${speaker.toLowerCase()}`;
+            const now = Date.now();
+            if (now - (mentionSeen.get(key) ?? 0) < MENTION_COOLDOWN_MS) return;
+            mentionSeen.set(key, now);
+
+            void (async () => {
+                // hands back everything, keep bedwars
+                const collected = await api.enrichment.collect({ name: speaker }, "CHAT", session);
+                const shown = tagsForGame(collected, "bedwars");
+                if (shown.length === 0) return;
+                // just the tag, with the full stats living in its hover
+                session.chat.raw(renderPlayerLine(speaker, shown));
+            })();
         });
 
         // resolve the command target and pull its data, reporting why not into chat

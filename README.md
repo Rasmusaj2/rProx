@@ -112,11 +112,14 @@ The built in plugins include:
 * **hypixelStats**
 
 Allows usage of //bw, //sw, //uhc, etc.
+
+When someone says your name in a Bedwars lobby (usually asking for a party invite), their Bedwars stats are shown so you can size them up before inviting.
 ```json
 "hypixelStats": {
     "enabled": true, 
     "apiKey": "", // Hypixel API Key
-    "cacheTtlSeconds": 300
+    "cacheTtlSeconds": 300,
+    "mentionStats": true // show a speakers bedwars stats when they mention your name in a bedwars lobby
 }
 ```
 * **nametagStats**
