@@ -64,7 +64,7 @@ The `proxy` block controls the server rProx presents to your client:
 
 `//help` - Shows the ingame help menu
 
-`//bw [user]` - Shows a players Bedwars statistics
+`//bw [user] [gamemode]` - Shows a players Bedwars statistics, optionally a single mode. Core modes (solo, doubles, 3s, 4s, 4v4, castle) and Dreams modes (rush, ultimate, lucky, voidless, armed, swap, underworld, one block...) are supported, and Dreams modes add up every queue they ran in with a per-queue breakdown (solo/doubles/4s)
 
 `//sw [user]` - Shows a players SkyWars statistics
 

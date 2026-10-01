@@ -352,6 +352,109 @@ export function bedwarsStats(player: HypixelPlayer): BedwarsStats {
     }
 }
 
+// core modes, dreams modes, with prefixes and aliases
+export interface BedwarsMode {
+    id: string;
+    name: string;
+    prefixes: string[]; // stat keys for hte mode from apii
+    aliases: string[]; // extra words the command accepts
+    dream: boolean;
+}
+
+export const BEDWARS_MODE_INFO: ReadonlyArray<BedwarsMode> = [
+    // core
+    { id: "solo", name: "Solo", prefixes: ["eight_one"], aliases: ["1", "1s", "single", "solos"], dream: false },
+    { id: "doubles", name: "Doubles", prefixes: ["eight_two"], aliases: ["2", "2s", "double", "dubs"], dream: false },
+    { id: "threes", name: "3v3v3v3", prefixes: ["four_three"], aliases: ["3", "3s", "three", "trios"], dream: false },
+    { id: "fours", name: "4v4v4v4", prefixes: ["four_four"], aliases: ["4", "4s", "four", "quad", "quads"], dream: false },
+    { id: "4v4", name: "4v4", prefixes: ["two_four"], aliases: ["44", "twofour"], dream: false },
+    { id: "castle", name: "Castle", prefixes: ["castle"], aliases: ["40v40", "40", "castles"], dream: false },
+
+    // dreams
+    { id: "rush", name: "Rush", prefixes: ["eight_one_rush", "eight_two_rush", "four_four_rush"], aliases: ["rushes"], dream: true },
+    { id: "ultimate", name: "Ultimate", prefixes: ["eight_one_ultimate", "eight_two_ultimate", "four_four_ultimate"], aliases: ["ult", "ults", "ultimates"], dream: true },
+    { id: "lucky", name: "Lucky Block", prefixes: ["eight_two_lucky", "four_four_lucky"], aliases: ["luck", "luckies", "luckyblock", "luckyblocks"], dream: true },
+    { id: "voidless", name: "Voidless", prefixes: ["eight_two_voidless", "four_four_voidless"], aliases: ["void"], dream: true },
+    { id: "armed", name: "Armed", prefixes: ["eight_two_armed", "four_four_armed"], aliases: ["gun", "guns"], dream: true },
+    { id: "swap", name: "Swappage", prefixes: ["eight_two_swap", "four_four_swap"], aliases: ["swaps", "swappage"], dream: true },
+    { id: "underworld", name: "Underworld", prefixes: ["eight_two_underworld", "four_four_underworld"], aliases: ["under"], dream: true }, // hallowwen
+    { id: "totallynormal", name: "Totally Normal", prefixes: ["eight_two_totallynormal"], aliases: ["normal", "totally"], dream: true }, // what even is this mode
+    { id: "oneblock", name: "One Block", prefixes: ["eight_one_oneblock"], aliases: ["one", "block", "ob"], dream: true },
+];
+
+const modeNames = (mode: BedwarsMode): string[] =>
+    [mode.id, mode.name, ...mode.aliases].map((part) => part.toLowerCase().replace(/[^a-z0-9]/g, ""));
+
+// exact match then prefix 
+export function findBedwarsMode(query: string): BedwarsMode | undefined {
+    const want = query.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!want) return undefined;
+    const exact = BEDWARS_MODE_INFO.find((mode) => modeNames(mode).includes(want));
+    if (exact) return exact;
+    return BEDWARS_MODE_INFO.find((mode) => modeNames(mode).some((name) => name.startsWith(want)));
+}
+
+const BEDWARS_QUEUE_NAMES: ReadonlyArray<readonly [prefix: string, name: string]> = [
+    ...BEDWARS_MODES,
+    ["castle", "Castle"],
+];
+
+export function bedwarsQueueName(prefix: string): string {
+    const match = BEDWARS_QUEUE_NAMES.find(([base]) => prefix === base || prefix.startsWith(`${base}_`));
+    return match?.[1] ?? prefix;
+}
+
+// stats for an arbitrary set of prefixes, added up
+function bedwarsStatsFor(player: HypixelPlayer, prefixes: string[], name: string): BedwarsModeStats {
+    const bw = player.stats?.Bedwars ?? {};
+    const n = (key: string): number => (typeof bw[key] === "number" && Number.isFinite(bw[key]) ? bw[key] : 0);
+    const sum = (key: string) => prefixes.reduce((total, prefix) => total + n(`${prefix}_${key}_bedwars`), 0);
+
+    const finalKills = sum("final_kills");
+    const finalDeaths = sum("final_deaths");
+    const wins = sum("wins");
+    const losses = sum("losses");
+    const kills = sum("kills");
+    const deaths = sum("deaths");
+    const bedsBroken = sum("beds_broken");
+    const bedsLost = sum("beds_lost");
+
+    return {
+        name,
+        finalKills,
+        finalDeaths,
+        fkdr: ratio(finalKills, finalDeaths),
+        wins,
+        losses,
+        wlr: ratio(wins, losses),
+        kills,
+        deaths,
+        kdr: ratio(kills, deaths),
+        bblr: ratio(bedsBroken, bedsLost),
+        bedsBroken,
+        bedsLost,
+    };
+}
+
+// mode stats summing up with multiple prefixes
+export function bedwarsModeStats(player: HypixelPlayer, mode: BedwarsMode): BedwarsModeStats {
+    return bedwarsStatsFor(player, mode.prefixes, mode.name);
+}
+
+export interface BedwarsQueueStats {
+    name: string;
+    stats: BedwarsModeStats;
+}
+
+// one entry per queue a mode ran in, so a dreams mode can show its parts
+export function bedwarsModeQueues(player: HypixelPlayer, mode: BedwarsMode): BedwarsQueueStats[] {
+    return mode.prefixes.map((prefix) => {
+        const name = bedwarsQueueName(prefix);
+        return { name, stats: bedwarsStatsFor(player, [prefix], name) };
+    });
+}
+
+
 // skywars stats
 // solo/teams/mega, suffix of every per mode key (ie. kills_solo). lab and
 // ranked left out, lab is retired and ranked barely anyone has data for

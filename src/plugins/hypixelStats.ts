@@ -13,6 +13,9 @@ import {
     fishingStats,
     fetchErrorMessage,
     findDuelsTarget,
+    findBedwarsMode,
+    bedwarsModeStats,
+    bedwarsModeQueues,
     duelsCategoryStats,
     DUELS_MODES,
     MYTHICAL_FANCY_NAMES,
@@ -20,6 +23,7 @@ import {
     type PlayerFetch,
 } from "../services/hypixel";
 import { duelsMode, duelsOverview } from "../services/duelsRender";
+import { bedwarsMode, bedwarsModeHelp } from "../services/bedwarsRender";
 import { bedwarsStar } from "../services/prestige";
 import * as fish from "../services/fishing";
 import {
@@ -61,7 +65,6 @@ function mentionsName(text: string, name: string): boolean {
 // autogenerates commands for every game based on tooltips from tags
 const autogen = {
             "hypixel": { "game": "general", description: "Network stats for a player (or yourself)" },
-            "bw": { "game": "bedwars", description: "Bedwars stats for a player (or yourself)" },
             "sw": { "game": "skywars", description: "SkyWars stats for a player (or yourself)" },
             "uhc": { "game": "uhc", description: "UHC stats for a player (or yourself)" },
             "tnt": { "game": "tntgames", description: "TNT Games stats for a player (or yourself)" },
@@ -391,8 +394,46 @@ export const hypixelStatsPlugin: Plugin = {
             "Arcade stats for every mode (or yourself)",
         );
 
+        // bw with subcommands for dreams
+        api.registerCommand(
+            "bw",
+            async (args, session) => {
+                let name: string | undefined = args[0];
+                let modeQuery = args[1];
+                if (args.length === 1 && findBedwarsMode(args[0]) && !session.findPlayer(args[0])) {
+                    modeQuery = args[0];
+                    name = undefined;
+                }
+
+                const found = await resolve(name ? [name] : [], session);
+                if (!found) return;
+
+                if (modeQuery) {
+                    const mode = findBedwarsMode(modeQuery);
+                    if (!mode) {
+                        session.chat.text(`${PREFIX} §7No bedwars mode called §f${modeQuery}§7.`);
+                        bedwarsModeHelp(session);
+                        return;
+                    }
+                    bedwarsMode(session, found.title, mode, bedwarsModeStats(found.player, mode), bedwarsModeQueues(found.player, mode));
+                    return;
+                }
+
+                const tag = tags.allTags(found.player).find((t) => t.game === "bedwars");
+                if (!tag?.tooltip) {
+                    session.chat.text(`${PREFIX} ${found.title} §7- §bBedwars`);
+                    session.chat.text(`  §7No Bedwars stats`);
+                    return;
+                }
+                const lines = tooltipLines(tag.tooltip);
+                session.chat.text(`${PREFIX} ${found.title} §7- ${lines[0]}`);
+                for (const line of lines.slice(1)) session.chat.text(`  ${line}`);
+            },
+            "Bedwars stats for a player, optionally a mode (//bw <player> <mode>)",
+        );
+
         // commands from map
-        const RENDERED = new Set(["duels", "fish"]);
+        const RENDERED = new Set(["duels", "fish", "bw"]);
         for (const [rawName, rawCommand] of Object.entries(autogen ?? {})) {
             if (!rawCommand || typeof rawCommand !== "object") {
                 api.log.warn(`tooltipCommands entry "${rawName}": needs { game, description }, skipping it`);
