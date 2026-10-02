@@ -35,7 +35,7 @@ export function bedwarsMode(
     // a dreams mode can have several submodes too (solos, doubles, 4s)
     const parts = queues.filter((queue) => played(queue.stats));
     if (parts.length < 2) return;
-    for (const queue of parts) session.chat.text(`    §f${queue.name}: ${queueLine(queue.stats)}`);
+    for (const queue of parts) session.chat.text(`    §4§l[${queue.name}] ${queueLine(queue.stats)}`);
 }
 
 export function bedwarsModeHelp(session: Session): void {

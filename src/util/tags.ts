@@ -73,12 +73,12 @@ export const bedwarsTags = (player: HypixelPlayer): Tag[] => {
     const modes = s.modes
         .filter((m) => m.finalKills + m.finalDeaths + m.kills + m.wins > 0)
         .map((m) =>
-            `§8${m.name}: §7FKDR: ${stat(m.fkdr, tiers.BEDWARS_FKDR).formatted}   §7WLR: ${w(m.wlr)}   §7BBLR: ${w(m.bblr)}\n` +
+            `§4§l[${m.name}]§r §7FKDR: ${stat(m.fkdr, tiers.BEDWARS_FKDR).formatted}   §7WLR: ${w(m.wlr)}   §7BBLR: ${w(m.bblr)}\n` +
             `§7Finals: ${w(m.finalKills.toLocaleString())}   §7Wins: ${w(m.wins.toLocaleString())}   §7Kills: ${w(m.kills.toLocaleString())}   §7Beds: ${w(m.bedsBroken.toLocaleString())}`,);
     return gameTags(
         "bedwars",
         [
-            `§7Bedwars ${star.formatted}`,
+            `§7Bedwars [${star.formatted}§7]`,
             `§7FKDR: ${fkdr.formatted}   §7WLR: ${w(s.wlr)}   §7KDR: ${w(s.kdr)}   §7BBLR: ${w(s.bblr)}`,
             `§7Finals: ${w(s.finalKills.toLocaleString())}   §7Final deaths: ${w(s.finalDeaths.toLocaleString())}   §7Winstreak: ${w(s.winstreak)}`,
             `§7Wins: ${w(s.wins.toLocaleString())}   §7Losses: ${w(s.losses.toLocaleString())}   §7Games: ${w(s.gamesPlayed.toLocaleString())}`,
