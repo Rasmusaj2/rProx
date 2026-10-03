@@ -74,12 +74,11 @@ export function duelsAnnounce(session: Session, title: string, category: DuelsCa
 
     const bridge = m.bridgeKills > 0 || m.bridgeDeaths > 0;
     const stats: string[] = [];
-    stats.push("  "); // spacing in front
     if (bridge) stats.push(`§fGoals: §a${m.goals.toLocaleString()}`);
     if (m.kills > 0 || bridge) stats.push(`§fKDR: ${tierFormat(bridge ? m.bridgeKdr : m.kdr, DUELS_KDR)}`);
     if (m.meleeSwings > 0) stats.push(`§fAccuracy: §a${m.meleeAccuracy}%`);
     if (m.bowShots > 0) stats.push(`§fBow: §a${m.bowAccuracy}%`);
-    if (stats.length > 0) session.chat.text(stats.join(BAR));
+    if (stats.length > 0) session.chat.text("  " + stats.join(BAR));
 
     if (category.modes.length > 1) {
         session.chat.text("");
@@ -89,7 +88,6 @@ export function duelsAnnounce(session: Session, title: string, category: DuelsCa
         }
     }
 
-    session.chat.text("");
     session.chat.text(divisionLine(m.division, category.name));
     session.chat.text(RULE);
 }
