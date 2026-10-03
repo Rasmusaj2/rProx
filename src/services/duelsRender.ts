@@ -47,6 +47,73 @@ export function duelsBreakdown(session: Session, categories: DuelsCategory[]): v
     }
 }
 
+// seperator lines
+const RULE = `§b${"▬".repeat(64)}`;
+const BAR = " §8| ";
+
+const record = (wins: number, losses: number, wlr: number): string =>
+    `§a${wins.toLocaleString()} W§7/§c${losses.toLocaleString()} L §7(${tierFormat(wlr, DUELS_WLR)}§f WLR§7)`;
+
+const streak = (label: string, current: number, best: number, hidden: boolean): string =>
+    hidden ? `§f${label}: ${c("dark_gray", "hidden")}` : `§f${label}: §a${current}§7/§c${best}`;
+
+const divisionLine = (d: DuelsDivision | null, name: string): string =>
+    `  §fDivision: ${d ? `§l${tierFormat(d.index, DUELS_DIVISION, `${name} ${d.label}`)}` : c("gray", "None")}`;
+
+// combined then subqueues
+export function duelsAnnounce(session: Session, title: string, category: DuelsCategory, streaksHidden: boolean, active?: string): void {
+    const m = category.combined;
+    session.chat.text(RULE);
+    session.chat.text(`${PREFIX} §f§lYour Opponent §r${title}§f's §b${category.name} §fStats`);
+    if (!m.played) {
+        session.chat.text(`§7No ${category.name} stats`);
+        session.chat.text(RULE);
+        return;
+    }
+    session.chat.text(`  ${record(m.wins, m.losses, m.wlr)}${BAR}${streak("Current/Best Winstreak", m.currentWinstreak, m.bestWinstreak, streaksHidden)}`);
+
+    const bridge = m.bridgeKills > 0 || m.bridgeDeaths > 0;
+    const stats: string[] = [];
+    stats.push("  "); // spacing in front
+    if (bridge) stats.push(`§fGoals: §a${m.goals.toLocaleString()}`);
+    if (m.kills > 0 || bridge) stats.push(`§fKDR: ${tierFormat(bridge ? m.bridgeKdr : m.kdr, DUELS_KDR)}`);
+    if (m.meleeSwings > 0) stats.push(`§fAccuracy: §a${m.meleeAccuracy}%`);
+    if (m.bowShots > 0) stats.push(`§fBow: §a${m.bowAccuracy}%`);
+    if (stats.length > 0) session.chat.text(stats.join(BAR));
+
+    if (category.modes.length > 1) {
+        session.chat.text("");
+        for (const mode of category.modes) {
+            const label = `${mode.key === active ? "§b" : "§7"}${mode.variant || mode.name}`;
+            session.chat.text(`  ${label}§8: ${record(mode.wins, mode.losses, mode.wlr)}${BAR}${streak("WS", mode.currentWinstreak, mode.bestWinstreak, streaksHidden)}`);
+        }
+    }
+
+    session.chat.text("");
+    session.chat.text(divisionLine(m.division, category.name));
+    session.chat.text(RULE);
+}
+
+export function duelsAnnounceOverview(session: Session, title: string, s: DuelsStats): void {
+    session.chat.text(RULE);
+    session.chat.text(`${PREFIX} §f§lYour Opponent §r${title}§f's §bDuels §fStats`);
+    if (s.categories.length === 0) {
+        session.chat.text(`§7No Duels stats`);
+        session.chat.text(RULE);
+        return;
+    }
+    session.chat.text(`${record(s.wins, s.losses, s.wlr)}${BAR}${streak("Current/Best Winstreak", s.currentWinstreak, s.bestWinstreak, s.winstreaksHidden)}`);
+    session.chat.text(`§fKDR: ${tierFormat(s.kdr, DUELS_KDR)}${BAR}§fAccuracy: §a${s.meleeAccuracy}%${BAR}§fBow: §a${s.bowAccuracy}%`);
+    session.chat.text("");
+    for (const category of s.categories) {
+        const m = category.combined;
+        session.chat.text(`§7${category.name}§8: ${record(m.wins, m.losses, m.wlr)}${BAR}${streak("WS", m.currentWinstreak, m.bestWinstreak, s.winstreaksHidden)}`);
+    }
+    session.chat.text("");
+    session.chat.text(divisionLine(s.division, "Duels"));
+    session.chat.text(RULE);
+}
+
 export function duelsMode(session: Session, title: string, m: DuelsModeStats, streaksHidden: boolean, queues: DuelsModeStats[] = []): void {
     session.chat.text(`${PREFIX} ${title} §7- §bDuels §8(§7${m.name}§8)${division(m.division)}`);
     if (!m.played) {

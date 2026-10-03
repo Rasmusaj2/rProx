@@ -1047,16 +1047,47 @@ export function findDuelsTarget(query: string): DuelsTarget | undefined {
     return nearMode ? { kind: "mode", mode: nearMode } : undefined;
 }
 
+// how the sidebar words a queue next to the game name, ie. "UHC Doubles", "Bridge Teams"
+const DUELS_QUEUE_WORDS: Record<string, string> = {
+    duel: "1v1",
+    solo: "1v1",
+    doubles: "2v2",
+    threes: "3v3",
+    four: "4v4",
+    fours: "4v4",
+    teams: "4v4",
+    meetup: "deathmatch",
+    ctf: "ctf3v3",
+    capture: "ctf3v3",
+};
+
+// which queue of a game the text names, if any. only for games with more than one queue
+function duelsQueueFromWords(category: string, words: string[]): DuelsMode | undefined {
+    const queues = DUELS_MODES.filter((mode) => mode.category === category);
+    if (queues.length < 2) return undefined;
+    const named = new Set(words.flatMap((word) => [word, DUELS_QUEUE_WORDS[word] ?? word]));
+    return queues
+        .filter((mode) => named.has(mode.variant.toLowerCase().replace(/\s/g, "")))
+        .sort((a, b) => b.variant.length - a.variant.length)[0]; // "3v3v3v3" over "3v3"
+}
+
+// the queue of a game that many opponents a side would be, ie. 2 for "2v2"
+export function duelsQueueForTeamSize(category: string, size: number): DuelsMode | undefined {
+    return DUELS_MODES.find((mode) => mode.category === category && mode.variant === `${size}v${size}`);
+}
+
 // pull a duels mode out of arbitrary scoreboard text (a sidebar title or row,
 // ie. "SkyWars Duels" or just "Bridge"). only exact names and aliases count, so
 // short words like "the" cannot prefix-match their way into "The Walls".
 export function duelsTargetFromText(text: string): DuelsTarget | undefined {
-    const clean = stripColorCodes(text)
+    const all = stripColorCodes(text)
         .toLowerCase()
-        .replace(/\bduels?\b/g, " ")
         .replace(/[^a-z0-9]+/g, " ")
-        .trim();
-    if (!clean) return undefined;
+        .split(" ")
+        .filter(Boolean);
+    // "duel" is kept in all, it is how the sidebar spells 1v1 (ie. "UHC Duel")
+    const words = all.filter((word) => word !== "duel" && word !== "duels");
+    if (words.length === 0) return undefined;
 
     const categories = new Map<string, string>();
     for (const [name, aliases] of Object.entries(DUELS_CATEGORY_ALIASES)) {
@@ -1069,13 +1100,15 @@ export function duelsTargetFromText(text: string): DuelsTarget | undefined {
         for (const alias of mode.aliases) modes.set(alias, mode);
     }
 
-    const words = clean.split(" ").filter(Boolean);
     // longest run first, so "bed wars" beats "wars" (nothing) and "mega walls" beats "walls"
     for (let size = Math.min(3, words.length); size >= 1; size--) {
         for (let i = 0; i + size <= words.length; i++) {
             const candidate = words.slice(i, i + size).join("");
             const category = categories.get(candidate);
-            if (category) return { kind: "category", category };
+            if (category) {
+                const mode = duelsQueueFromWords(category, all);
+                return mode ? { kind: "mode", mode } : { kind: "category", category };
+            }
             const mode = modes.get(candidate);
             if (mode) return { kind: "mode", mode };
         }

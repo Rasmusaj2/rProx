@@ -7,10 +7,11 @@ import {
     duelsStats,
     duelsCategoryStats,
     duelsTargetFromText,
+    duelsQueueForTeamSize,
     fetchErrorMessage,
     type DuelsTarget,
 } from "../services/hypixel";
-import { duelsMode, duelsOverview } from "../services/duelsRender";
+import { duelsAnnounce, duelsAnnounceOverview } from "../services/duelsRender";
 import { formatRankedName } from "../services/rank";
 import { dashUuid, resolveUuid } from "../services/microsoft";
 import { stripColorCodes } from "../util/mcColors";
@@ -379,12 +380,11 @@ export const duelsStatsPlugin: Plugin = {
             const title = formatRankedName(result.player, name);
             const s = duelsStats(result.player);
             if (target?.kind === "category") {
-                const category = duelsCategoryStats(s, target.category);
-                duelsMode(session, title, category.combined, s.winstreaksHidden, category.modes);
+                duelsAnnounce(session, title, duelsCategoryStats(s, target.category), s.winstreaksHidden); // can tell category
             } else if (target?.kind === "mode") {
-                duelsMode(session, title, s.modes[target.mode.key], s.winstreaksHidden);
+                duelsAnnounce(session, title, duelsCategoryStats(s, target.mode.category), s.winstreaksHidden, target.mode.key);
             } else {
-                duelsOverview(session, title, s); // no mode readable, fall back to the whole account
+                duelsAnnounceOverview(session, title, s); // no mode readable, fall back to the whole account
             }
         };
 
@@ -394,7 +394,12 @@ export const duelsStatsPlugin: Plugin = {
             if (!inDuels(session, state)) return;
             const pending = [...state.enemies.values()].filter((name) => !state.announced.has(name.toLowerCase()));
             if (pending.length === 0) return;
-            const target = targetFor(state);
+            let target = targetFor(state);
+            if (target?.kind === "category") {
+                // the scoreboard named the game but not the queue, so go off how many opponents there are
+                const mode = duelsQueueForTeamSize(target.category, state.enemies.size);
+                if (mode) target = { kind: "mode", mode };
+            }
             api.log.debug(`duelsStats posting ${pending.length} opponent(s)${target ? "" : " (no mode detected)"}`);
             let first = true;
             for (const name of pending) {
