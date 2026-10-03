@@ -8,7 +8,29 @@ interface PartyTeamsConfig {
     enabled?: boolean;
     apiKey?: string;
     delaySeconds?: number; // wait after the start line before announcing, lets team packets land
+    stars?: StatMode;
+    fkdr?: StatMode;
+    wlr?: StatMode;
+    bblr?: StatMode;
 }
+
+type StatMode = "sum" | "average" | "off";
+const STAT_MODES: ReadonlyArray<StatMode> = ["sum", "average", "off"];
+
+interface MemberStats {
+    stars: number;
+    fkdr: number;
+    wlr: number;
+    bblr: number;
+}
+
+// orderhere matters, first displayed first
+const STATS: ReadonlyArray<{ key: keyof MemberStats; fallback: StatMode; format: (value: number) => string }> = [
+    { key: "stars", fallback: "sum", format: (value) => `✫${Math.round(value)}` },
+    { key: "fkdr", fallback: "sum", format: (value) => `${value.toFixed(2)} FKDR` },
+    { key: "wlr", fallback: "off", format: (value) => `${value.toFixed(2)} WLR` },
+    { key: "bblr", fallback: "off", format: (value) => `${value.toFixed(2)} BBLR` },
+];
 
 const DEFAULT_DELAY_SECONDS = 1;
 const GAME_START_COOLDOWN_MS = 15_000;
@@ -62,12 +84,16 @@ function apiKeyOf(api: Parameters<Plugin["setup"]>[0], config: PartyTeamsConfig)
 export const partyTeamsPlugin: Plugin = {
     name: "partyTeams",
     version: "0.1.0",
-    description: "Posts combined team stars/fkdr to party chat on Bedwars game start.",
+    description: "Posts team stars/fkdr/wlr/bblr to party chat on Bedwars game start.",
 
         defaultConfig: {
             enabled: true,
             apiKey: "", // empty falls back to builtInPlugins.hypixelStats.apiKey
             delaySeconds: DEFAULT_DELAY_SECONDS,
+            stars: "sum",
+            fkdr: "sum",
+            wlr: "off",
+            bblr: "off",
         },
 
     setup(api) {
@@ -152,7 +178,7 @@ export const partyTeamsPlugin: Plugin = {
             session: Session,
             state: SessionState,
             name: string,
-        ): Promise<{ level: number; fkdr: number } | { nick: true } | undefined> => {
+        ): Promise<MemberStats | { nick: true } | undefined> => {
             const key = name.toLowerCase();
             let uuid = state.uuids.get(key);
             if (!uuid) {
@@ -174,7 +200,16 @@ export const partyTeamsPlugin: Plugin = {
                 return undefined;
             }
             const stats = bedwarsStats(result.player);
-            return { level: stats.level, fkdr: stats.fkdr };
+            return { stars: stats.level, fkdr: stats.fkdr, wlr: stats.wlr, bblr: stats.bblr };
+        };
+
+        const modeOf = (key: keyof MemberStats, fallback: StatMode): StatMode => {
+            const raw = config[key];
+            if (raw === undefined) return fallback;
+            const mode = String(raw).trim().toLowerCase() as StatMode;
+            if (STAT_MODES.includes(mode)) return mode;
+            api.log.warn(`partyTeams ${key}: "${raw}" is not one of ${STAT_MODES.join(", ")}, using "${fallback}"`);
+            return fallback;
         };
 
         const gameTeams = (state: SessionState): Map<string, Set<string>> => {
@@ -199,6 +234,11 @@ export const partyTeamsPlugin: Plugin = {
         const announce = async (session: Session, state: SessionState): Promise<void> => {
             if (!hypixel().enabled) return; // no key yet
             api.log.debug(`partyTeams announce for ${session.username}'s session, ${state.teams.size} scoreboard teams`);
+            const shown = STATS.map((stat) => ({ ...stat, mode: modeOf(stat.key, stat.fallback) })).filter((stat) => stat.mode !== "off");
+            if (shown.length === 0) {
+                api.log.debug(`partyTeams has every stat off, skipping announce`);
+                return;
+            }
             const teams = gameTeams(state);
             if (teams.size === 0) {
                 const dump = [...state.teams.entries()]
@@ -227,19 +267,22 @@ export const partyTeamsPlugin: Plugin = {
                 const team = TEAM_LETTERS[letter];
                 const members = membersOf(players);
                 const stats = members.map((member) => statsByMember.get(member));
-                const got = stats.filter((s): s is { level: number; fkdr: number } => s !== undefined && !("nick" in s));
+                const got = stats.filter((s): s is MemberStats => s !== undefined && !("nick" in s));
                 const nicks = stats.filter((s) => s !== undefined && "nick" in s).length;
                 if (got.length === 0 && nicks === 0) {
                     api.log.debug(`partyTeams [${letter}] had no usable stats for ${members.length} members, skipping`);
                     continue; // nothing usable, dont post an empty line
                 }
 
-                const stars = got.reduce((sum, s) => sum + s.level, 0);
-                const fkdr = got.reduce((sum, s) => sum + s.fkdr, 0);
+                // nicks have no stats, so an average is over the members that do
+                const parts = shown.map((stat) => {
+                    const total = got.reduce((sum, s) => sum + s[stat.key], 0);
+                    return stat.format(stat.mode === "average" && got.length > 0 ? total / got.length : total);
+                });
                 const us = members.some((member) => state.uuids.get(member.toLowerCase()) === session.uuid);
 
                 const line =
-                    `[${team.label}] ${us ? "(US) " : ""}- ✫${stars} - ${fkdr.toFixed(2)} FKDR` +
+                    `[${team.label}] ${us ? "(US) " : ""}- ${parts.join(" - ")}` +
                     (nicks > 0 ? ` (${nicks} nick${nicks === 1 ? "" : "s"})` : "");
                 if (sent) await new Promise((resolve) => setTimeout(resolve, SEND_DELAY_MS));
                 session.sendUpstream(`/pc ${line}`);

@@ -232,11 +232,17 @@ Posts combined team stars & FKDR to party chat when a Bedwars game starts, so yo
 
 Lines look like `[RED] (US) - ✫60 - 4.25 FKDR (1 nick)`, showing (US) when its your own team
 
+Stars, FKDR, WLR and BBLR can each be set to `"sum"` (added up across the team), `"average"` (per player, nicks left out) or `"off"` (not shown)
+
 ```json
 "partyTeams": {
     "enabled": true,
     "apiKey": "", // empty falls back to builtInPlugins.hypixelStats.apiKey
-    "delaySeconds": 1 // wait after the start line before announcing, lets teams actually settle
+    "delaySeconds": 1, // wait after the start line before announcing, lets teams actually settle
+    "stars": "sum", // "sum", "average" or "off"
+    "fkdr": "sum",
+    "wlr": "off",
+    "bblr": "off"
 }
 ```
 
