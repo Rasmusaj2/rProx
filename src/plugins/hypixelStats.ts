@@ -23,7 +23,7 @@ import {
     type PlayerFetch,
 } from "../services/hypixel";
 import { duelsMode, duelsOverview } from "../services/duelsRender";
-import { bedwarsMode, bedwarsModeHelp } from "../services/bedwarsRender";
+import { bedwarsMode, bedwarsModeHelp, bedwarsOverview } from "../services/bedwarsRender";
 import { bedwarsStar } from "../services/prestige";
 import * as fish from "../services/fishing";
 import {
@@ -419,15 +419,7 @@ export const hypixelStatsPlugin: Plugin = {
                     return;
                 }
 
-                const tag = tags.allTags(found.player).find((t) => t.game === "bedwars");
-                if (!tag?.tooltip) {
-                    session.chat.text(`${PREFIX} ${found.title} §7- §bBedwars`);
-                    session.chat.text(`  §7No Bedwars stats`);
-                    return;
-                }
-                const lines = tooltipLines(tag.tooltip);
-                session.chat.text(`${PREFIX} ${found.title} §7- ${lines[0]}`);
-                for (const line of lines.slice(1)) session.chat.text(`  ${line}`);
+                bedwarsOverview(session, found.title, bedwarsStats(found.player));
             },
             "Bedwars stats for a player, optionally a mode (//bw <player> <mode>)",
         );

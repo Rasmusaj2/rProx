@@ -2,17 +2,39 @@ import { PREFIX } from "../core/chat";
 import type { Session } from "../core/types";
 import { COLOR_CODES, type McColorName } from "../util/mcColors";
 import { tierFormat, BEDWARS_FKDR } from "./thresholds";
-import { BEDWARS_MODE_INFO, type BedwarsMode, type BedwarsModeStats, type BedwarsQueueStats } from "./hypixel";
+import { bedwarsStar } from "./prestige";
+import { BEDWARS_MODE_INFO, type BedwarsMode, type BedwarsModeStats, type BedwarsQueueStats, type BedwarsStats } from "./hypixel";
 
 // rendering for //bw lives here so a mode reads the same no matter where from
 const c = (color: McColorName, value: string | number) => COLOR_CODES[color] + value;
 
-const played = (s: BedwarsModeStats) =>
+const played = (s: Omit<BedwarsModeStats, "name">) =>
     s.finalKills + s.finalDeaths + s.kills + s.wins + s.losses + s.bedsBroken > 0;
 
-const queueLine = (s: BedwarsModeStats): string =>
-    `§7Wins: ${c("white", s.wins.toLocaleString())}  §7WLR: ${c("white", s.wlr)}` +
-    `  §7FKDR: ${tierFormat(s.fkdr, BEDWARS_FKDR)}  §7BBLR: ${c("white", s.bblr)}`;
+type Totals = Omit<BedwarsModeStats, "name">;
+
+const pair = (label: string, ratio: string, a: number, b: number): string =>
+    `§7${label} ${ratio} §8(${c("white", a.toLocaleString())}§8/${c("white", b.toLocaleString())}§8)`;
+
+const summary = (s: Totals): string[] => [
+    `${pair("FKDR", tierFormat(s.fkdr, BEDWARS_FKDR), s.finalKills, s.finalDeaths)}  ${pair("WLR", c("white", s.wlr), s.wins, s.losses)}`,
+    `${pair("KDR", c("white", s.kdr), s.kills, s.deaths)}  ${pair("BBLR", c("white", s.bblr), s.bedsBroken, s.bedsLost)}`,
+];
+
+const queueLine = (name: string, s: Totals): string =>
+    `§4§l[${name}]§r §7FKDR ${tierFormat(s.fkdr, BEDWARS_FKDR)} §8(${c("white", s.finalKills.toLocaleString())}§8)` +
+    `  §7WLR ${c("white", s.wlr)} §8(${c("white", s.wins.toLocaleString())}§8)  §7BBLR ${c("white", s.bblr)}`;
+
+export function bedwarsOverview(session: Session, title: string, s: BedwarsStats): void {
+    session.chat.text(`${PREFIX} ${title} §7- §bBedwars §7[${bedwarsStar(s.level).formatted}§7]`);
+    if (s.level === 0 && s.finalKills === 0) {
+        session.chat.text(`  §7No Bedwars stats`);
+        return;
+    }
+    for (const line of summary(s)) session.chat.text(`  ${line}`);
+    session.chat.text(`  §7Winstreak ${c("white", s.winstreak.toLocaleString())}  §7Games ${c("white", s.gamesPlayed.toLocaleString())}`);
+    for (const mode of s.modes.filter(played)) session.chat.text(`  ${queueLine(mode.name, mode)}`);
+}
 
 export function bedwarsMode(
     session: Session,
@@ -27,15 +49,12 @@ export function bedwarsMode(
         session.chat.text(`  §7No ${mode.name} stats`);
         return;
     }
-    session.chat.text(`  §7Wins: ${c("white", s.wins.toLocaleString())}  §7Losses: ${c("white", s.losses.toLocaleString())}  §7WLR: ${c("white", s.wlr)}`);
-    session.chat.text(`  §7Final kills: ${c("white", s.finalKills.toLocaleString())}  §7Final deaths: ${c("white", s.finalDeaths.toLocaleString())}  §7FKDR: ${tierFormat(s.fkdr, BEDWARS_FKDR)}`);
-    session.chat.text(`  §7Kills: ${c("white", s.kills.toLocaleString())}  §7Deaths: ${c("white", s.deaths.toLocaleString())}  §7KDR: ${c("white", s.kdr)}`);
-    session.chat.text(`  §7Beds broken: ${c("white", s.bedsBroken.toLocaleString())}  §7Beds lost: ${c("white", s.bedsLost.toLocaleString())}  §7BBLR: ${c("white", s.bblr)}`);
+    for (const line of summary(s)) session.chat.text(`  ${line}`);
 
     // a dreams mode can have several submodes too (solos, doubles, 4s)
     const parts = queues.filter((queue) => played(queue.stats));
     if (parts.length < 2) return;
-    for (const queue of parts) session.chat.text(`    §4§l[${queue.name}] ${queueLine(queue.stats)}`);
+    for (const queue of parts) session.chat.text(`  ${queueLine(queue.name, queue.stats)}`);
 }
 
 export function bedwarsModeHelp(session: Session): void {
