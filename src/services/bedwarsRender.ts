@@ -22,7 +22,7 @@ const summary = (s: Totals): string[] => [
 ];
 
 const queueLine = (name: string, s: Totals): string =>
-    `§4§l[${name}]§r §7FKDR ${tierFormat(s.fkdr, BEDWARS_FKDR)} §8(${c("white", s.finalKills.toLocaleString())}§8)` +
+    `§b§l[${name}]§r §7FKDR ${tierFormat(s.fkdr, BEDWARS_FKDR)} §8(${c("white", s.finalKills.toLocaleString())}§8)` +
     `  §7WLR ${c("white", s.wlr)} §8(${c("white", s.wins.toLocaleString())}§8)  §7BBLR ${c("white", s.bblr)}`;
 
 export function bedwarsOverview(session: Session, title: string, s: BedwarsStats): void {
