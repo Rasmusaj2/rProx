@@ -98,17 +98,54 @@ The `proxy` block controls the server rProx presents to your client:
 
 `//urchin [user]` - Check a users Urchin tags
 
+`//nickuse` - Apply the name from the last `/nick` roll (also the `[USE]` button)
+
+`//nickreroll` - Roll another `/nick` name without reopening the book (also the `[REROLL]` button)
+
+`//nickshow` - Reprint the buttons for the current `/nick` roll
+
 `//config` - Open `config.json` as a chest gui and allows you to edit it ingame.
 > **Note:** Some config items are not editable while the process is running, and will require a restart.
 
 ### Core Plugin Configuration
 
-rProx comes with 7 inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing, partyTeams & a daily reward handler
+rProx comes with several inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing, partyTeams & a daily reward handler
 
 Configuration for these are set in [`config.json`](config.json) section called `builtInPlugins` - This section also works for configuration for external plugins, but the tooling for this is uncomplete.
 
 The built in plugins include:
 
+* **Core**
+
+Owns the base commands, `//config`, and the common chat utilities. This plugin is required and cannot be disabled.
+
+**AutoBoop** automatically `/boop`s friends or guild members when their join message shows up in chat, and can boop back anyone that boops you (a boop arrives as a `From <user>: Boop!` DM).
+
+**blocked_messages** hides chat lines matching any of the given patterns from your client.
+
+**nickbook** turns Hypixel's `/nick` book into clickable `[USE]` / `[REROLL]` buttons in chat and stops the book window from opening.
+```json
+"core": {
+    "enabled": true,
+    "blocked_messages": {
+        "enabled": true,
+        "patterns": ["Slow down! You can only use /tip every few seconds."] // lines containing any of these are hidden from you
+    },
+    "autoBoop": {
+        "enabled": true,
+        "players": [], // names to /boop when they join (friends/guild)
+        "boopBack": false // /boop back anyone thhat boops you
+    },
+    "nickbook": {
+        "enabled": true,
+        "restoreHeldItem": true,
+        "rerollCooldownMs": 400,
+        "useLabels": ["USE NAME"],
+        "rerollLabels": ["TRY AGAIN"],
+        "trace": false
+    }
+}
+```
 * **hypixelStats**
 
 Allows usage of //bw, //sw, //uhc, etc.

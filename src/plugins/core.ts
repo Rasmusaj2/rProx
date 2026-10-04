@@ -26,6 +26,11 @@ export function createCoreCommandsPlugin(
                     "Slow down! You can only use /tip every few seconds."
                 ]
             },
+            autoBoop: {
+                enabled: true,
+                players: [], // join autoboop
+                boopBack: false, //boopback
+            },
             nickbook: {
                 enabled: true,
                 restoreHeldItem: true,
@@ -39,6 +44,7 @@ export function createCoreCommandsPlugin(
 
         setup(api) {
             chatFilter(api);
+            autoBoop(api);
             registerNickbook(api);
             api.registerCommand(
                 "who",
@@ -151,6 +157,40 @@ export function createCoreCommandsPlugin(
             }
         },
     };
+
+    // auto /boop
+    function autoBoop(api: PluginApi): void {
+        const config = api.pluginConfig.autoBoop as
+            | { enabled?: boolean; players?: string[]; boopBack?: boolean }
+            | undefined;
+        if (!config?.enabled) return;
+
+        const targets = new Set(
+            (config.players ?? []).map((name) => String(name).trim().toLowerCase()).filter(Boolean),
+        );
+        const JOIN = /^(?:Friend|Guild) > (?:\[[^\]]+\] )?([A-Za-z0-9_]{1,16}) joined\b/;
+        const BOOPED = /^From (?:\[[^\]]+\] )?([A-Za-z0-9_]{1,16}): Boop!?\s*$/i;
+
+        api.on("chat", (msg, session) => {
+            const text = msg.text.trim();
+
+            const join = JOIN.exec(text);
+            if (join) {
+                if (targets.has(join[1].toLowerCase())) {
+                    session.sendUpstream(`/boop ${join[1]}`);
+                    api.log.debug(`auto-booped ${join[1]} on join`);
+                }
+                return;
+            }
+
+            if (!config.boopBack) return;
+            const boop = BOOPED.exec(text);
+            if (boop && boop[1].toLowerCase() !== session.username.toLowerCase()) {
+                session.sendUpstream(`/boop ${boop[1]}`);
+                api.log.debug(`auto-booped ${boop[1]} back`);
+            }
+        });
+    }
 
     function chatFilter(api: PluginApi): void {
         const blockedMessages = api.pluginConfig.blocked_messages as
