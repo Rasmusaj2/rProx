@@ -14,6 +14,12 @@
         "dir": "./auth",
         "requireMatchingAccount": true
     },
+    "tray": {
+        "enabled": true,
+        "startMinimized": false,
+        "notify": true,
+        "icon": ""
+    },
     "commandPrefix": "//",
     "detection": {
         "autoWhoOnStart": true,

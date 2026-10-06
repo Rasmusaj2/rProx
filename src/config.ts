@@ -21,6 +21,12 @@ export interface Config {
         dir: string, // ./auth
         requireMatchingAccount: boolean, // true - can allow linking to another account if false
     },
+    tray: { // windows only
+        enabled: boolean,
+        startMinimized: boolean,
+        notify: boolean,
+        icon: string,
+    },
     commandPrefix: string, // // - what marks a message as a proxy command instead of chat
     detection: {
         autoWhoOnStart: boolean, // true - automatically send /who on server join
@@ -53,6 +59,12 @@ const DEFAULTS: Config = {
     auth: {
         dir: "./auth",
         requireMatchingAccount: true,
+    },
+    tray: {
+        enabled: true,
+        startMinimized: false,
+        notify: true,
+        icon: "",
     },
     commandPrefix: "//",
     detection: {

@@ -9,6 +9,7 @@ import { PluginManager } from "./core/pluginManager";
 import { ProxyServer } from "./proxy/server";
 import { PREFIX, component } from "./core/chat";
 import { runOnboarding } from "./onboarding";
+import { attachConsole, isBackground, launchBackground, startBackground, trayEnabled } from "./tray";
 
 import { createCoreCommandsPlugin } from "./plugins/core";
 import { hypixelStatsPlugin } from "./plugins/hypixelStats";
@@ -24,7 +25,12 @@ async function main(): Promise<void> {
     const firstRun = !configExists();
     const config = loadConfig();
     const log = createLogger("main");
-    log.info("rProx starting...");
+
+    const background = isBackground();
+    const tray = trayEnabled(config) && !background; // this console is only the front for a detached copy
+
+    if (tray && (await attachConsole())) return; // already running, console is a viewer
+    if (background) startBackground(config);
 
     const http = new HttpClient();
     const bus = new EventBus();
@@ -48,6 +54,14 @@ async function main(): Promise<void> {
         await runOnboarding(config, builtIn);
         saveConfig(config);
     }
+
+    // setup needed a real console
+    if (tray) {
+        await launchBackground(config);
+        return;
+    }
+
+    log.info("rProx starting...");
 
     // load builtin plugins first
     await plugins.registerAll(builtIn);
@@ -91,5 +105,6 @@ async function main(): Promise<void> {
 
 main().catch((error) => {
     console.error("fatal:", error);
-    process.exit(1);
+    // give time to reattach to background copy
+    setTimeout(() => process.exit(1), isBackground() ? 250 : 0);
 });
