@@ -25,15 +25,19 @@ const queueLine = (name: string, s: Totals): string =>
     `§b§l[${name}]§r §7FKDR ${tierFormat(s.fkdr, BEDWARS_FKDR)} §8(${c("white", s.finalKills.toLocaleString())}§8)` +
     `  §7WLR ${c("white", s.wlr)} §8(${c("white", s.wins.toLocaleString())}§8)  §7BBLR ${c("white", s.bblr)}`;
 
+export const bedwarsOverviewLines = (s: BedwarsStats): string[] => [
+    ...summary(s),
+    `§7Winstreak ${c("white", s.winstreak.toLocaleString())}  §7Games ${c("white", s.gamesPlayed.toLocaleString())}`,
+    ...s.modes.filter(played).map((mode) => queueLine(mode.name, mode)),
+];
+
 export function bedwarsOverview(session: Session, title: string, s: BedwarsStats): void {
     session.chat.text(`${PREFIX} ${title} §7- §bBedwars §7[${bedwarsStar(s.level).formatted}§7]`);
     if (s.level === 0 && s.finalKills === 0) {
         session.chat.text(`  §7No Bedwars stats`);
         return;
     }
-    for (const line of summary(s)) session.chat.text(`  ${line}`);
-    session.chat.text(`  §7Winstreak ${c("white", s.winstreak.toLocaleString())}  §7Games ${c("white", s.gamesPlayed.toLocaleString())}`);
-    for (const mode of s.modes.filter(played)) session.chat.text(`  ${queueLine(mode.name, mode)}`);
+    for (const line of bedwarsOverviewLines(s)) session.chat.text(`  ${line}`);
 }
 
 export function bedwarsMode(

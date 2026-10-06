@@ -26,6 +26,7 @@ import {
 } from "../services/hypixel";
 import { allWins, block, compact, inner, num, ownStat, stat, sumValues, total, type Raw, type Stat } from "../services/games";
 import { bedwarsStar, woolStar } from "../services/prestige";
+import { bedwarsOverviewLines } from "../services/bedwarsRender";
 import * as tiers from "../services/thresholds";
 import type { Thresholds } from "../services/thresholds";
 import { COLOR_CODES, firstColor } from "../util/mcColors";
@@ -70,22 +71,9 @@ export const bedwarsTags = (player: HypixelPlayer): Tag[] => {
     const star = bedwarsStar(s.level);
     const fkdr = stat(s.fkdr, tiers.BEDWARS_FKDR);
 
-    const modes = s.modes
-        .filter((m) => m.finalKills + m.finalDeaths + m.kills + m.wins > 0)
-        .map((m) =>
-            `§4§l[${m.name}]§r §7FKDR: ${stat(m.fkdr, tiers.BEDWARS_FKDR).formatted}   §7WLR: ${w(m.wlr)}   §7BBLR: ${w(m.bblr)}\n` +
-            `§7Finals: ${w(m.finalKills.toLocaleString())}   §7Wins: ${w(m.wins.toLocaleString())}   §7Kills: ${w(m.kills.toLocaleString())}   §7Beds: ${w(m.bedsBroken.toLocaleString())}`,);
     return gameTags(
         "bedwars",
-        [
-            `§7Bedwars [${star.formatted}§7]`,
-            `§7FKDR: ${fkdr.formatted}   §7WLR: ${w(s.wlr)}   §7KDR: ${w(s.kdr)}   §7BBLR: ${w(s.bblr)}`,
-            `§7Finals: ${w(s.finalKills.toLocaleString())}   §7Final deaths: ${w(s.finalDeaths.toLocaleString())}   §7Winstreak: ${w(s.winstreak)}`,
-            `§7Wins: ${w(s.wins.toLocaleString())}   §7Losses: ${w(s.losses.toLocaleString())}   §7Games: ${w(s.gamesPlayed.toLocaleString())}`,
-            `§7Kills: ${w(s.kills.toLocaleString())}   §7Deaths: ${w(s.deaths.toLocaleString())}`,
-            `§7Beds Broken: ${w(s.bedsBroken.toLocaleString())}   §7Beds Lost: ${w(s.bedsLost.toLocaleString())}`,
-            ...modes,
-        ],
+        [`§bBedwars §7[${star.formatted}§7]`, ...bedwarsOverviewLines(s)],
         star,
         fkdr,
     );
