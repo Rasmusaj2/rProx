@@ -30,6 +30,7 @@ export function createCoreCommandsPlugin(
                 enabled: true,
                 players: [], // join autoboop
                 boopBack: false, //boopback
+                boo: false, // halloween event, /boo instead of /boop
             },
             nickbook: {
                 enabled: true,
@@ -161,23 +162,27 @@ export function createCoreCommandsPlugin(
     // auto /boop
     function autoBoop(api: PluginApi): void {
         const config = api.pluginConfig.autoBoop as
-            | { enabled?: boolean; players?: string[]; boopBack?: boolean }
+            | { enabled?: boolean; players?: string[]; boopBack?: boolean; boo?: boolean }
             | undefined;
         if (!config?.enabled) return;
+
+        
 
         const targets = new Set(
             (config.players ?? []).map((name) => String(name).trim().toLowerCase()).filter(Boolean),
         );
         const JOIN = /^(?:Friend|Guild) > (?:\[[^\]]+\] )?([A-Za-z0-9_]{1,16}) joined\b/;
-        const BOOPED = /^From (?:\[[^\]]+\] )?([A-Za-z0-9_]{1,16}): Boop!?\s*$/i;
+        const BOOPED = /^From (?:\[[^\]]+\] )?([A-Za-z0-9_]{1,16}): Boop?!?\s*$/i;
 
         api.on("chat", (msg, session) => {
             const text = msg.text.trim();
 
+            const command = config.boo ? "/boo" : "/boop";
+
             const join = JOIN.exec(text);
             if (join) {
                 if (targets.has(join[1].toLowerCase())) {
-                    session.sendUpstream(`/boop ${join[1]}`);
+                    session.sendUpstream(`${command} ${join[1]}`);
                     api.log.debug(`auto-booped ${join[1]} on join`);
                 }
                 return;
@@ -186,7 +191,7 @@ export function createCoreCommandsPlugin(
             if (!config.boopBack) return;
             const boop = BOOPED.exec(text);
             if (boop && boop[1].toLowerCase() !== session.username.toLowerCase()) {
-                session.sendUpstream(`/boop ${boop[1]}`);
+                session.sendUpstream(`${command} ${boop[1]}`);
                 api.log.debug(`auto-booped ${boop[1]} back`);
             }
         });

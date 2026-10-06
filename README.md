@@ -56,6 +56,21 @@ The `proxy` block controls the server rProx presents to your client:
 ```
 `icon` accepts either a path to a 64x64 `.png` (relative to the folder you run rProx from) or a ready-made `data:image/png;base64,...` string.
 
+### Tray icon
+
+rProx can run in the background, and collapse into a tray icon to avoid you accidentally closing the proxy.
+
+Config options for this can be found in the "tray" section
+
+```json
+"tray": {
+    "enabled": true, // if false, will close when the console is closed
+    "startMinimized": false, // start in the tray instead of with console
+    "notify": true, // balloon saying where it went when started minimized
+    "icon": "" // .png icon path
+}
+```
+
 ## Default Commands
 () -  Required  arguments
 [] - Optional Arguments
@@ -134,7 +149,8 @@ Owns the base commands, `//config`, and the common chat utilities. This plugin i
     "autoBoop": {
         "enabled": true,
         "players": [], // names to /boop when they join (friends/guild)
-        "boopBack": false // /boop back anyone thhat boops you
+        "boopBack": false, // /boop back anyone thhat boops you
+        "boo": false // halloween event: send /boo instead of /boop (and boo back on "Boo!")
     },
     "nickbook": {
         "enabled": true,
