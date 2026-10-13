@@ -11,7 +11,8 @@ import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
 import { LobbyTracker, parseWhoResponse, type PlayerInfoPacket } from "../core/lobby";
 import { dashUuid } from "../services/microsoft";
-import { makeChatInjector, parseChat, parsePlayerChat, PREFIX } from "../core/chat";
+import { componentToLegacy, makeChatInjector, parseChat, parsePlayerChat, PREFIX } from "../core/chat";
+import { stripColorCodes } from "../util/mcColors";
 import { createWindowApi } from "../interface/windowApi";
 import { createTitleApi } from "../interface/titleApi";
 import type { ChatMessage, Session } from "../core/types";
@@ -254,16 +255,19 @@ export class ProxyServer {
         };
 
         let ended = false;
+        // what hypixel said when it kicked us, if it said anything
+        let kickReason = "";
         const cleanup = (who: string, reason?: unknown) => {
             if (ended) return;
             ended = true;
-            clog.info(`session ended (${who})${reason ? `: ${reason}` : ""}`);
+            const detail = kickReason || (reason && reason !== "socketClosed" ? String(reason) : "");
+            clog.info(`session ended (${who})${detail ? `: ${stripColorCodes(detail)}` : ""}`);
             this.lastGameStart.delete(session.id);
             this.bedwarsStarted.delete(session.id);
             windows.dispose();
             title.dispose();
             try {
-                client.end("Proxy connection closed");
+                client.end(["§cProxy connection closed", `§7${who}`, ...(detail ? ["", `§f${detail}`] : [])].join("\n"));
             } catch {
                 // already down
             }
@@ -316,7 +320,12 @@ export class ProxyServer {
         });
         target.once("login", () => clog.info("upstream authenticated & connected"));
         target.on("error", (error: unknown) => cleanup("upstream error", (error as Error)?.message));
-        target.on("end", () => cleanup("upstream closed"));
+        const onKick = (data: { reason?: unknown }) => {
+            kickReason = componentToLegacy(this.config.proxy.version, data?.reason);
+        };
+        target.on("disconnect", onKick);
+        target.on("kick_disconnect", onKick);
+        target.on("end", (reason: unknown) => cleanup("upstream closed", reason));
 
         // client to hypixel: forward decoded, intercept our own commands
         client.on("packet", (data: any, meta: { name: string; state: string }) => {
