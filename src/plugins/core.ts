@@ -1,7 +1,7 @@
 import { PREFIX } from "../core/chat";
 import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
-import type { Plugin, PluginApi } from "../core/types";
+import type { Plugin, PluginApi, Session } from "../core/types";
 import { createConfigEditor, parsePath, resolvePath } from "./corePluginUtils/configEditor";
 import { registerNickbook } from "./corePluginUtils/nickbook";
 
@@ -32,6 +32,12 @@ export function createCoreCommandsPlugin(
                 boopBack: false, //boopback
                 boo: false, // halloween event, /boo instead of /boop
             },
+            autoGetOffMyFace: {
+                enabled: true,
+                useWhitelist: false,
+                whitelist: [],
+                blacklist: [],
+            },
             nickbook: {
                 enabled: true,
                 restoreHeldItem: true,
@@ -46,6 +52,7 @@ export function createCoreCommandsPlugin(
         setup(api) {
             chatFilter(api);
             autoBoop(api);
+            autoGetOffMyFace(api);
             registerNickbook(api);
             api.registerCommand(
                 "who",
@@ -194,6 +201,120 @@ export function createCoreCommandsPlugin(
                 session.sendUpstream(`${command} ${boop[1]}`);
                 api.log.debug(`auto-booped ${boop[1]} back`);
             }
+        });
+    }
+
+    // cowboy gadget detection
+    function autoGetOffMyFace(api: PluginApi): void {
+        const config = api.pluginConfig.autoGetOffMyFace as
+            | { enabled?: boolean; useWhitelist?: boolean; whitelist?: string[]; blacklist?: string[] }
+            | undefined;
+        if (!config) return;
+
+        interface FaceState {
+            self?: number; // own entity id
+            uuids: Map<number, string>; // entity id to player uuid
+            vehicles: Map<number, number>; // rider entity id to vehicle entity id
+            pending?: ReturnType<typeof setTimeout>;
+            lastSent: number;
+        }
+        const sessions = new Map<string, FaceState>();
+        const stateFor = (id: string): FaceState => {
+            let state = sessions.get(id);
+            if (!state) {
+                state = { uuids: new Map(), vehicles: new Map(), lastSent: 0 };
+                sessions.set(id, state);
+            }
+            return state;
+        };
+        const forget = (state: FaceState) => {
+            clearTimeout(state.pending);
+            state.pending = undefined;
+            state.uuids.clear();
+            state.vehicles.clear();
+        };
+        const normalize = (uuid: string) => uuid.replace(/-/g, "").toLowerCase();
+        const has = (list: string[] | undefined, name: string) =>
+            (list ?? []).some((entry) => String(entry).trim().toLowerCase() === name);
+
+        // gadget makes invisable bat ride the player and goes through that. skip non-players
+        const riderOnMe = (state: FaceState): number | undefined => {
+            const seen = new Set<number>();
+            let current = state.self;
+            while (current !== undefined && !seen.has(current)) {
+                seen.add(current);
+                let above: number | undefined;
+                for (const [rider, vehicle] of state.vehicles) {
+                    if (vehicle === current) above = rider;
+                }
+                if (above === undefined || state.uuids.has(above)) return above;
+                current = above;
+            }
+            return undefined;
+        };
+
+        // they dont attach at the same time so wait
+        const check = (state: FaceState, session: Session) => {
+            state.pending = undefined;
+            if (!config.enabled) return;
+
+            const rider = riderOnMe(state);
+            if (rider === undefined) return;
+            const uuid = state.uuids.get(rider);
+            const name = session.players().find((player) => player.uuid && normalize(player.uuid) === uuid)?.name;
+            api.log.debug(`riding you: ${name ?? `player ${uuid}`} (entity ${rider})`);
+
+            const lower = name?.toLowerCase();
+            const blacklisted = lower !== undefined && has(config.blacklist, lower);
+            const whitelisted = lower !== undefined && has(config.whitelist, lower);
+            if (!blacklisted && !(config.useWhitelist && !whitelisted)) return;
+
+            if (Date.now() - state.lastSent < 1000) return;
+            state.lastSent = Date.now();
+            session.sendUpstream("/getoffmyface");
+            api.log.debug(`/getoffmyface on ${name ?? `entity ${rider}`}`);
+        };
+
+        api.on("serverPacket", (name, data, session) => {
+            if (name === "login") {
+                const state = stateFor(session.id);
+                forget(state);
+                state.self = data.entityId;
+                return;
+            }
+            const state = sessions.get(session.id);
+            if (!state) return;
+
+            if (name === "respawn") {
+                forget(state);
+            } else if (name === "named_entity_spawn") {
+                state.uuids.set(data.entityId, normalize(String(data.playerUUID)));
+            } else if (name === "entity_destroy") {
+                for (const id of data.entityIds ?? []) {
+                    state.uuids.delete(id);
+                    state.vehicles.delete(id);
+                }
+            } else if (name === "attach_entity" && !data.leash) {
+                if (data.vehicleId === -1) {
+                    state.vehicles.delete(data.entityId);
+                    return;
+                }
+                if (state.vehicles.get(data.entityId) === data.vehicleId) return; // no change
+                state.vehicles.set(data.entityId, data.vehicleId);
+                if (!config.enabled || state.self === undefined) return;
+                clearTimeout(state.pending);
+                state.pending = setTimeout(() => check(state, session), 250);
+            }
+        });
+
+        api.on("sessionEnd", (session) => {
+            const state = sessions.get(session.id);
+            if (state) forget(state);
+            sessions.delete(session.id);
+        });
+        api.onCleanup(() => {
+            for (const state of sessions.values()) forget(state);
+            sessions.clear();
         });
     }
 
