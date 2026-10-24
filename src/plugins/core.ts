@@ -4,6 +4,7 @@ import type { PluginManager } from "../core/pluginManager";
 import type { Plugin, PluginApi, Session } from "../core/types";
 import { createConfigEditor, parsePath, resolvePath } from "./corePluginUtils/configEditor";
 import { registerNickbook } from "./corePluginUtils/nickbook";
+import { registerPlayerNotes } from "./corePluginUtils/playerNotes";
 
 // built in commands. gets handed the enrichment engine and plugin registry
 // directly since its a first party plugin, not a drop-in one.
@@ -14,7 +15,7 @@ export function createCoreCommandsPlugin(
 ): Plugin {
     return {
         name: "Core",
-        version: "0.3.0",
+        version: "0.4.0",
         description: "Plugin containing core commands (//help, //who, //plugins, etc), and common helpful utilities",
         forceLoad: true, // disabling this would take //config (and //help, //plugins) with it
 
@@ -46,7 +47,18 @@ export function createCoreCommandsPlugin(
                 useLabels: ["USE NAME"],
                 rerollLabels: ["TRY AGAIN"],
                 trace: false, // log the packet info for debugging
-            }
+            },
+            playerNotes: {
+                enabled: true,
+                file: "./playernotes.json",
+                friendsListHover: true,
+                alerts: {
+                    enabled: true,
+                    onJoin: true,
+                    onLobby: true,
+                    repeatSeconds: 300,
+                },
+            },
         },
 
         setup(api) {
@@ -54,6 +66,7 @@ export function createCoreCommandsPlugin(
             autoBoop(api);
             autoGetOffMyFace(api);
             registerNickbook(api);
+            registerPlayerNotes(api);
             api.registerCommand(
                 "who",
                 (_args, session) => {
