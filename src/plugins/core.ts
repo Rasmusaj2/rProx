@@ -1,3 +1,4 @@
+import { saveConfig } from "../config";
 import { PREFIX } from "../core/chat";
 import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
@@ -67,6 +68,7 @@ export function createCoreCommandsPlugin(
             autoGetOffMyFace(api);
             registerNickbook(api);
             registerPlayerNotes(api);
+            apiKeys(api);
             api.registerCommand(
                 "who",
                 (_args, session) => {
@@ -329,6 +331,48 @@ export function createCoreCommandsPlugin(
             for (const state of sessions.values()) forget(state);
             sessions.clear();
         });
+    }
+
+    // api key change
+    function apiKeys(api: PluginApi): void {
+        const TARGETS: Record<string, { plugin: string; label: string; reload: boolean }> = {
+            hypixel: { plugin: "hypixelStats", label: "Hypixel", reload: false },
+            urchin: { plugin: "urchin", label: "Urchin", reload: true }, // only checked in setup so needs to be reloaded. TODO: fix in the future but i cant be bothered
+        };
+        const mask = (key: string) => (key.length <= 6 ? "******" : `${key.slice(0, 4)}...${key.slice(-2)}`);
+
+        api.registerCommand(
+            "key",
+            (args, session) => {
+                const [which, key] = args;
+                const target = TARGETS[which?.toLowerCase() ?? ""];
+                if (!target) {
+                    session.chat.text(`${PREFIX} §7Usage: §f${prefix}key <${Object.keys(TARGETS).join("|")}> [key]`);
+                    return;
+                }
+
+                const existing = api.config.builtInPlugins[target.plugin];
+                const block = typeof existing === "object" && existing !== null && !Array.isArray(existing)
+                    ? (existing as Record<string, unknown>)
+                    : {};
+                api.config.builtInPlugins[target.plugin] = block;
+
+                if (!key) {
+                    const current = typeof block.apiKey === "string" ? block.apiKey : "";
+                    session.chat.text(`${PREFIX} §7${target.label} key: ${current ? `§f${mask(current)}` : "§cnot set"}`);
+                    session.chat.text(`  §7Set it with §f${prefix}key ${which.toLowerCase()} <key>`);
+                    return;
+                }
+
+                block.apiKey = key.trim();
+                saveConfig(api.config);
+                api.log.info(`${session.username} set the ${target.label} api key (${mask(key)})`);
+                session.chat.text(`${PREFIX} §aSet the ${target.label} key §7to §f${mask(key)}`);
+
+                if (target.reload) plugins.reload(target.plugin);
+            },
+            "set an api key, //key <hypixel|urchin> <key>",
+        );
     }
 
     function chatFilter(api: PluginApi): void {

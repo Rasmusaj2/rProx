@@ -204,6 +204,15 @@ export class PluginManager {
         return true;
     }
 
+    // relload a plugin to reload config
+    async reload(name: string): Promise<boolean> {
+        const source = this.sources.get(name);
+        if (!source || !this.loaded.includes(name)) return false;
+        this.teardown(name);
+        await this.register(source.plugin, source.file);
+        return this.loaded.includes(name);
+    }
+
     isForced(name: string): boolean {
         return this.sources.get(name)?.plugin.forceLoad === true;
     }
