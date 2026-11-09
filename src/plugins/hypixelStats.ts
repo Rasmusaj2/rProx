@@ -213,14 +213,61 @@ export const hypixelStatsPlugin: Plugin = {
                 if (session && !warnedSessions.has(session.id)) {
                     warnedSessions.add(session.id);
                     alertInvalidKey(session);
+                    flashInvalidKey(session)
                 }
             }
             return result;
         };
 
+        const KEY_CHECK_DELAY_MS = 1000; // let the client get past the loading screen
+        const FLASHES = 4;
+        const FLASH_MS = 400;
+        const keyChecked = new Set<string>();
+        const keyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+        const later = (session: Session, ms: number, run: () => void): void => {
+            clearTimeout(keyTimers.get(session.id));
+            keyTimers.set(session.id, setTimeout(() => {
+                keyTimers.delete(session.id);
+                run();
+            }, ms));
+        };
+
+        const flashInvalidKey = (session: Session, step = 0): void => {
+            if (step >= FLASHES) {
+                // hold the last one for a bit, then hand titles back to hypixel
+                later(session, 3000, () => session.title.reset());
+                return;
+            }
+            session.title.show(
+                step % 2 === 0 ? "§4§lINVALID API KEY" : "§f§lINVALID API KEY",
+                "§7Your Hypixel API key expired",
+                { fadeIn: 0, stay: 80, fadeOut: 10 },
+            );
+            later(session, FLASH_MS, () => flashInvalidKey(session, step + 1));
+        };
+
+        // make sure to fire on login even if nametagStats is disabled in lobbies.
+        api.on("serverPacket", (name, _data, session) => {
+            if (name !== "login" || keyChecked.has(session.id) || !service().enabled) return;
+            keyChecked.add(session.id);
+            later(session, KEY_CHECK_DELAY_MS, async () => {
+                const result = await fetch({ name: session.username, uuid: session.uuid }, { essential: true }, session);
+            });
+        });
+
+        api.on("sessionEnd", (session) => {
+            keyChecked.delete(session.id);
+            clearTimeout(keyTimers.get(session.id));
+            keyTimers.delete(session.id);
+        });
+        api.onCleanup(() => {
+            for (const timer of keyTimers.values()) clearTimeout(timer);
+            keyTimers.clear();
+        });
+
         // one tag pair per game - a prestige-ish value in front of the name and a
         // ratio trailing it. whoever renders picks the set matching the game.
-        
 
         api.registerEnricher({
             name: "hypixelStats",
