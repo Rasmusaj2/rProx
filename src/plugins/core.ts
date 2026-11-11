@@ -4,6 +4,7 @@ import type { EnrichmentEngine } from "../core/enrichment";
 import type { PluginManager } from "../core/pluginManager";
 import type { Plugin, PluginApi, Session } from "../core/types";
 import { createConfigEditor, parsePath, resolvePath } from "./corePluginUtils/configEditor";
+import { DAILY_REWARDS_DEFAULTS, registerDailyRewards } from "./corePluginUtils/dailyRewards";
 import { registerNickbook } from "./corePluginUtils/nickbook";
 import { registerPlayerNotes } from "./corePluginUtils/playerNotes";
 
@@ -20,8 +21,13 @@ export function createCoreCommandsPlugin(
         description: "Plugin containing core commands (//help, //who, //plugins, etc), and common helpful utilities",
         forceLoad: true, // disabling this would take //config (and //help, //plugins) with it
 
+        configMoves: [
+            { from: "dailyRewards", to: "dailyRewards" }, // used to be its own plugin
+        ],
+
         defaultConfig: {
             enabled: true,
+            dailyRewards: DAILY_REWARDS_DEFAULTS,
             blocked_messages: {
                 enabled: true,
                 patterns: [
@@ -68,6 +74,7 @@ export function createCoreCommandsPlugin(
             autoGetOffMyFace(api);
             registerNickbook(api);
             registerPlayerNotes(api);
+            registerDailyRewards(api);
             apiKeys(api);
             api.registerCommand(
                 "who",

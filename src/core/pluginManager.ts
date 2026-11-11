@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { createLogger } from "../util/log";
 import { fromBase, isPackaged } from "../util/paths";
 import type { HttpClient } from "../util/http";
-import { applyPluginDefaults, saveConfig, type Config } from "../config";
+import { applyConfigMoves, applyPluginDefaults, saveConfig, type Config } from "../config";
 import { installHostModules } from "./pluginHost";
 import type { EventBus } from "./events";
 import type { EnrichmentEngine } from "./enrichment";
@@ -51,6 +51,15 @@ export class PluginManager {
     }
 
     private ensureConfig(plugin: Plugin): void {
+        // migrate any plugins into "combined" or "new name" plugins. this lets me rename plugins *relatively* easily
+        const moved = applyConfigMoves(
+            this.config,
+            plugin.name,
+            plugin.configMoves ?? [],
+            (from) => from !== plugin.name && this.sources.has(from), // plugin still exists (or potentionally added externally/future update built in)
+        );
+        for (const move of moved) log.info(`migrated config: ${move}`);
+        if (moved.length > 0 && !this.freshDefaults.includes(plugin.name)) this.freshDefaults.push(plugin.name);
         const defaults = plugin.defaultConfig ?? { enabled: true }; // a plugin without a defaultConfig is still on by default, but has no settings to write
         if (applyPluginDefaults(this.config, plugin.name, defaults)) this.freshDefaults.push(plugin.name);
     }

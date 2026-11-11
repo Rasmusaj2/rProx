@@ -162,6 +162,54 @@ function fillDefaults(target: Record<string, unknown>, defaults: Record<string, 
 }
 
 
+// moves builtInPlugins.<from> to builtInPlugins.<plugin>.<to>
+// this is used for renamed plugins, combined plugins, split utilities, etc. when we want to preserve the old config block
+// a setting already sitting in the new spot wins over the old one. returns what was moved, for the log
+export function applyConfigMoves(
+    config: Config,
+    plugin: string,
+    moves: ReadonlyArray<{ from: string | string[]; to: string; keys?: string[] }>,
+    skip?: (from: string) => boolean,
+): string[] {
+    const root = config.builtInPlugins;
+    const walk = (path: string[]): Record<string, unknown> | undefined => {
+        let node: unknown = root;
+        for (const part of path) {
+            if (!isBlock(node)) return undefined;
+            node = node[part];
+        }
+        return isBlock(node) ? node : undefined;
+    };
+
+    const done: string[] = [];
+    const spent = new Set<string>(); // old blocks to drop once every move has read them
+    for (const move of moves) {
+        for (const from of Array.isArray(move.from) ? move.from : [move.from]) {
+            if (skip?.(from)) continue;
+            const source = walk(from.split("."));
+            if (!source) continue;
+
+            let target = root as Record<string, unknown>;
+            for (const part of [plugin, ...move.to.split(".")]) {
+                if (!isBlock(target[part])) target[part] = {};
+                target = target[part] as Record<string, unknown>;
+            }
+            if (target === source) continue; // moved onto itself, nothing to do
+            for (const key of move.keys ?? Object.keys(source)) {
+                if (key in source && !(key in target)) target[key] = source[key];
+            }
+            spent.add(from);
+            done.push(`builtInPlugins.${from} -> builtInPlugins.${plugin}.${move.to}`);
+        }
+    }
+    for (const from of spent) {
+        const path = from.split(".");
+        const parent = walk(path.slice(0, -1));
+        if (parent) delete parent[path[path.length - 1]];
+    }
+    return done;
+}
+
 export function applyPluginDefaults(config: Config, name: string, defaults: Record<string, unknown>): boolean {
     const existing = config.builtInPlugins[name];
     const block = isBlock(existing) ? existing : {};

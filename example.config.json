@@ -33,7 +33,7 @@
         }
     },
     "builtInPlugins": {
-        "coreCommands": {
+        "Core": {
             "enabled": true
         },
         "hypixelStats": {
@@ -50,13 +50,6 @@
             "maxTablistPlayers": 32,
             "lookupConcurrency": 4,
             "disableInLobby": false
-        },
-        "dailyRewards": {
-            "enabled": true,
-            "mode": "chat",
-            "prefer": [],
-            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) rProx/0.1",
-            "timeoutMs": 10000
         },
         "antiAfk": {
             "enabled": false,
@@ -99,11 +92,29 @@
                 "safeHeat": 40
             }
         },
-        "duelsStats": {
+        "bedwarsUtils": {
             "enabled": true,
-            "apiKey": "",
-            "delaySeconds": 1,
-            "includeSelf": true
+            "teamStatsAnnouncer": {
+                "enabled": true,
+                "apiKey": "",
+                "delaySeconds": 1,
+                "stars": "sum",
+                "fkdr": "sum",
+                "wlr": "off",
+                "bblr": "off"
+            }
+        },
+        "duelsUtils": {
+            "enabled": true,
+            "opponentStats": {
+                "enabled": true,
+                "apiKey": "",
+                "delaySeconds": 1
+            },
+            "pregameRanks": {
+                "enabled": true,
+                "includeSelf": true
+            }
         },
         "example": {
             "enabled": true,

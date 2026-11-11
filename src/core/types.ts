@@ -116,5 +116,13 @@ export interface Plugin {
     description?: string;
     defaultConfig?: Record<string, unknown>;
     forceLoad?: boolean; // cannot be disabled from config (ie. Core, which owns //config)
+    configMoves?: ConfigMove[]; // old config blocks this plugin took over (renames, merges, splits), moved on load
     setup(api: PluginApi): void | Promise<void>;
+}
+
+// builtInPlugins.<from> is moved to builtInPlugins.<this plugin>.<to>
+export interface ConfigMove {
+    from: string | string[]; // can list multiple old config paths, and all will be moved to the same path
+    to: string;
+    keys?: string[]; // only these settings, everything if left out
 }

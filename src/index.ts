@@ -14,12 +14,11 @@ import { attachConsole, isBackground, launchBackground, startBackground, trayEna
 import { createCoreCommandsPlugin } from "./plugins/core";
 import { hypixelStatsPlugin } from "./plugins/hypixelStats";
 import { createNametagStatsPlugin } from "./plugins/nametagStats";
-import { dailyRewardsPlugin } from "./plugins/dailyRewards";
 import { antiAfkPlugin } from "./plugins/antiAfk";
 import { lobbyFishingPlugin } from "./plugins/lobbyFishing";
 import { urchinPlugin } from "./plugins/urchin";
-import { partyTeamsPlugin } from "./plugins/partyTeams";
-import { duelsStatsPlugin } from "./plugins/duelsStats";
+import { bedwarsUtilsPlugin } from "./plugins/bedwarsUtils";
+import { duelsUtilsPlugin } from "./plugins/duelsUtils";
 
 async function main(): Promise<void> {
     const firstRun = !configExists();
@@ -41,12 +40,11 @@ async function main(): Promise<void> {
         createCoreCommandsPlugin(enrichment, plugins, config.commandPrefix), // forceload
         hypixelStatsPlugin,
         createNametagStatsPlugin(enrichment),
-        dailyRewardsPlugin,
         antiAfkPlugin,
         lobbyFishingPlugin,
         urchinPlugin,
-        partyTeamsPlugin,
-        duelsStatsPlugin,
+        bedwarsUtilsPlugin,
+        duelsUtilsPlugin,
     ];
 
     // first boot onboarding setup

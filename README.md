@@ -124,7 +124,7 @@ Config options for this can be found in the "tray" section
 
 ### Core Plugin Configuration
 
-rProx comes with several inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing, partyTeams & a daily reward handler
+rProx comes with several inbuilt plugins for basic tooling, such as the stat commands mentioned previously, nametagStats, antiAfk, lobbyFishing, bedwarsUtils, duelsUtils & a daily reward handler
 
 Configuration for these are set in [`config.json`](config.json) section called `builtInPlugins` - This section also works for configuration for external plugins, but the tooling for this is uncomplete.
 
@@ -139,8 +139,12 @@ Owns the base commands, `//config`, and the common chat utilities. This plugin i
 **blocked_messages** hides chat lines matching any of the given patterns from your client.
 
 **nickbook** turns Hypixel's `/nick` book into clickable `[USE]` / `[REROLL]` buttons in chat and stops the book window from opening.
+
+**dailyRewards** catches daily reward links in chat, and either claims them or offers the options in chat (`//reward`).
+
+> **Migrating:** `dailyRewards` used to be its own plugin. Config settings should be automatically migrated.
 ```json
-"core": {
+"Core": {
     "enabled": true,
     "blocked_messages": {
         "enabled": true,
@@ -188,18 +192,6 @@ Shows player statistics in the tab menu or above their playerhead in lobbies & g
     "lookupConcurrency": 4, // how many lookups are allowed to be in flight at once
     "disableInLobby": false // skip lookups while in a lobby, saving the ratelimit for actual games
 } // NOTE: API Key here leeches from hypixelStats
-```
-* **dailyRewards**
-
-Automatically claims daily reward links in chat
-```json
-"dailyRewards": {
-    "enabled": true,
-    "mode": "chat", // chat or auto - Decides if it should automatically claim a link when seen, or give the option to pick in chat
-    "prefer": [], // which specific game to prefer, ie. "uhc", "skywars", "walls3". Will autopick this incase of ties
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) rProx/0.1", // what the reward page is asked as
-    "timeoutMs": 10000
-}
 ```
 * **lobbyFishing**
 
@@ -279,23 +271,54 @@ Players can be looked up with `//urchin`
             }
         }
 ```
-* **partyTeams**
+* **bedwarsUtils**
 
-Posts combined team stars & FKDR to party chat when a Bedwars game starts, so your entire team does not need
+Every Bedwars utility in one plugin. Each utility is its own block with its own `enabled`, so one can be switched off without losing the rest.
+
+> **Migrating:** `teamStatsAnnouncer` used to be the `partyTeams` plugin. Config settings should be automatically migrated.
+
+**teamStatsAnnouncer** posts combined team stars & FKDR to party chat when a Bedwars game starts, so your entire team does not need
 
 Lines look like `[RED] (US) - ✫60 - 4.25 FKDR (1 nick)`, showing (US) when its your own team
 
 Stars, FKDR, WLR and BBLR can each be set to `"sum"` (added up across the team), `"average"` (per player, nicks left out) or `"off"` (not shown)
 
 ```json
-"partyTeams": {
+"bedwarsUtils": {
     "enabled": true,
-    "apiKey": "", // empty falls back to builtInPlugins.hypixelStats.apiKey
-    "delaySeconds": 1, // wait after the start line before announcing, lets teams actually settle
-    "stars": "sum", // "sum", "average" or "off"
-    "fkdr": "sum",
-    "wlr": "off",
-    "bblr": "off"
+    "teamStatsAnnouncer": {
+        "enabled": true,
+        "apiKey": "", // empty falls back to builtInPlugins.hypixelStats.apiKey
+        "delaySeconds": 1, // wait after the start line before announcing, lets teams actually settle
+        "stars": "sum", // "sum", "average" or "off"
+        "fkdr": "sum",
+        "wlr": "off",
+        "bblr": "off"
+    }
+}
+```
+* **duelsUtils**
+
+Every Duels utility in one plugin, laid out the same way as bedwarsUtils.
+
+> **Migrating:** both utilities used to be the one `duelsStats` plugin. Config settings should be automatically migrated
+
+**opponentStats** shows your opponents stats in the mode you are playing when a duel starts
+
+**pregameRanks** keeps a tally of the ranks in the pregame queue (`Pregame ranks: MVP+ (1), NICKED (1)`)
+
+```json
+"duelsUtils": {
+    "enabled": true,
+    "opponentStats": {
+        "enabled": true,
+        "apiKey": "", // empty falls back to builtInPlugins.hypixelStats.apiKey
+        "delaySeconds": 1 // wait after the opponent line before looking them up
+    },
+    "pregameRanks": {
+        "enabled": true,
+        "includeSelf": true // count your own rank in the tally
+    }
 }
 ```
 
