@@ -15,6 +15,7 @@ import { componentToLegacy, makeChatInjector, parseChat, parsePlayerChat, PREFIX
 import { stripColorCodes } from "../util/mcColors";
 import { createWindowApi } from "../interface/windowApi";
 import { createTitleApi } from "../interface/titleApi";
+import { createSoundApi } from "../interface/soundApi";
 import type { ChatMessage, Session } from "../core/types";
 
 const log = createLogger("proxy");
@@ -234,6 +235,13 @@ export class ProxyServer {
                 onError: (error) => clog.debug(`title api: ${error}`),
             },
         );
+        const sound = createSoundApi(
+            { sendPacket: toClient },
+            {
+                version: this.config.proxy.version,
+                onError: (error) => clog.debug(`sound api: ${error}`),
+            },
+        );
         const session: Session = { // player sessions
             id,
             username: client.username,
@@ -243,6 +251,7 @@ export class ProxyServer {
             lobby: true,
             windows,
             title,
+            sound,
             sendUpstream: (message: string) => {
                 if (target.state === states.PLAY) target.write("chat", { message });
             },
@@ -266,6 +275,7 @@ export class ProxyServer {
             this.bedwarsStarted.delete(session.id);
             windows.dispose();
             title.dispose();
+            sound.dispose();
             try {
                 client.end(["§cProxy connection closed", `§7${who}`, ...(detail ? ["", `§f${detail}`] : [])].join("\n"));
             } catch {
@@ -306,6 +316,7 @@ export class ProxyServer {
                 windows.handleServerPacket(meta.name, data);
                 withholdRaw = windows.withholdsServerPacket(meta.name);
                 title.handlePacket(meta.name, data);
+                if (sound.handleServerPacket(meta.name, data)) withholdRaw = true;
                 this.bus.emit("serverPacket", meta.name, data, session);
             } catch (error) {
                 clog.debug(`parse error: ${error}`);
@@ -339,6 +350,7 @@ export class ProxyServer {
             // swallow anything else it asked for. both still get the event, same as
             // a hidden chat line does
             const inWindow = windows.handleClientPacket(meta.name, data);
+            sound.handleClientPacket(meta.name, data);
             const filtered = this.plugins.blocksClient(meta.name, data, session);
             this.bus.emit("clientPacket", meta.name, data, session);
             if (inWindow || filtered) return;

@@ -245,6 +245,7 @@ Can be toggled with `//afk on` & `//afk off`
     "autoStart": true, // if should be enabled on login, or you have to use //afk on
     "lobbyOnly": true, // only message while in a lobby, held back during games (needs nametagStats on)
     "targetUser": null, // what user to message. If null, will message yourself.
+    "mutePling": true, // mute the dm "pling" sound when messaging yourself
     "dmCooldownMs": 750 // delay between messages enforced on hypixel, slightly longer than 500ms 
 }
 ```
@@ -359,7 +360,7 @@ Higher level helpers like the sidebar api are handed out by the proxy under the
 name `rprox`, so a plugin never has to know where they sit on disk:
 
 ```js
-const { createBossBarApi, createSidebarApi, colors } = require("rprox"); // or "rprox/bossbar", "rprox/sidebar", "rprox/colors" if you wish to import only certain functionality.
+const { createBossBarApi, createSidebarApi, sound, colors } = require("rprox"); // or "rprox/bossbar", "rprox/sidebar", "rprox/sound", "rprox/colors" if you wish to import only certain functionality.
 ```
 
 Do not require them by path. `require("../src/interface/sidebarApi")` only works when running from source, not as a packaged `.exe` 

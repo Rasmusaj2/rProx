@@ -1,6 +1,7 @@
 import Module from "node:module";
 import * as bossbar from "../interface/bossbarApi";
 import * as sidebar from "../interface/sidebarApi";
+import * as sound from "../interface/soundApi";
 import * as title from "../interface/titleApi";
 import * as windows from "../interface/windowApi";
 import * as colors from "../util/mcColors";
@@ -13,6 +14,7 @@ const api = {
     ...bossbar,
     ...sidebar,
     ...windows,
+    ...sound,
     colors,
 };
 
@@ -28,12 +30,14 @@ const registry = new Map<string, unknown>([
     ["rprox/sidebar", sidebar],
     ["rprox/window", windows],
     ["rprox/title", title],
+    ["rprox/sound", sound],
     ["rprox/colors", colors],
     // what a plugin written against the checked out repo would have asked for
     ["interface/bossbarApi", bossbar],
     ["interface/sidebarApi", sidebar],
     ["interface/windowApi", windows],
     ["interface/titleApi", title],
+    ["interface/soundApi", sound],
     ["util/mcColors", colors],
 ]);
 
