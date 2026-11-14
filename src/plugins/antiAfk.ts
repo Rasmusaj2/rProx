@@ -1,4 +1,5 @@
 import { PREFIX } from "../core/chat";
+import { sound } from "../interface/soundApi";
 import type { Plugin, Session } from "../core/types";
 
 interface AntiAfkConfig {
@@ -10,7 +11,8 @@ interface AntiAfkConfig {
     hideMessages?: boolean; // swallow the To/From echo
     autoStart?: boolean; // start on join, or wait for //afk
     lobbyOnly?: boolean;
-    targetUser?: string | null; // use a targetUser instead of yourself for the DM, lets you avoid the "pling" on dm
+    targetUser?: string | null; // dm a targetUser instead of yourself
+    mutePling?: boolean; // hide the pling on own dm
     dmCooldownMs?: number; // "you can only message every 0.5 seconds" fix
 }
 
@@ -26,6 +28,8 @@ const DEFAULT_DM_COOLDOWN = 750;
 const KEEP_TOKENS = 4;
 // what counts as a dm command
 const DM_COMMAND = /^\/(?:msg|m|w|tell|r|reply|message|pm)\b/i;
+// how long after sending the pling of our own dm may take to come back
+const PLING_WINDOW = 5000;
 
 //hypixel shows this when /status offline, avoid sending dms as it errors
 const APPEARING_OFFLINE = /appearing offline/i;
@@ -36,6 +40,7 @@ interface AfkState {
     tokens: string[];
     lastSentAt: number; // when anti-afk last sent its own dm
     lastChatAt: number; // when you last had a chat message go upstream
+    unmute?: () => void;
 }
 
 // finding the "to user" line
@@ -61,6 +66,7 @@ export const antiAfkPlugin: Plugin = {
         autoStart: true,
         lobbyOnly: true,
         targetUser: null,
+        mutePling: true,
         dmCooldownMs: DEFAULT_DM_COOLDOWN,
     },
 
@@ -120,6 +126,11 @@ export const antiAfkPlugin: Plugin = {
             state.tokens.push(token);
             if (state.tokens.length > KEEP_TOKENS) state.tokens.shift();
             const target = targetOf(session);
+            // dming yourself plings, mute just the one that comes back with it
+            if (config.mutePling && target.toLowerCase() === session.username.toLowerCase()) {
+                state.unmute?.();
+                state.unmute = session.sound.block(sound.random.orb, { once: true, timeoutMs: PLING_WINDOW });
+            }
             session.sendUpstream(`/msg ${target} ${token}`);
             state.lastSentAt = Date.now();
             api.log.debug(`anti-afk dm for ${session.username}: ${token} (message sent to ${target})`);
@@ -140,6 +151,7 @@ export const antiAfkPlugin: Plugin = {
             if (!state) return;
             if (state.timer) clearInterval(state.timer);
             if (state.retry) clearTimeout(state.retry);
+            state.unmute?.();
             sessions.delete(sessionId);
         };
 
