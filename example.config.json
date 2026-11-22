@@ -102,6 +102,14 @@
                 "fkdr": "sum",
                 "wlr": "off",
                 "bblr": "off"
+            },
+            "diamondShop": {
+                "enabled": true,
+                "rows": 5,
+                "title": "§bTeam Upgrades",
+                "filler": "gray",
+                "showEditButton": true,
+                "showUnmapped": true
             }
         },
         "duelsUtils": {

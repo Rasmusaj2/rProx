@@ -284,6 +284,8 @@ Lines look like `[RED] (US) - ✫60 - 4.25 FKDR (1 nick)`, showing (US) when its
 
 Stars, FKDR, WLR and BBLR can each be set to `"sum"` (added up across the team), `"average"` (per player, nicks left out) or `"off"` (not shown)
 
+**diamondShop** replaces Hypixel's Bedwars Upgrades & Traps chest with a customizable layout (rearrange upgrades, traps, trap queue slots, rows, and filler glass). Run `//dshop` or click the in-shop Customize button to edit your layout in a chest GUI.
+
 ```json
 "bedwarsUtils": {
     "enabled": true,
@@ -295,6 +297,14 @@ Stars, FKDR, WLR and BBLR can each be set to `"sum"` (added up across the team),
         "fkdr": "sum",
         "wlr": "off",
         "bblr": "off"
+    },
+    "diamondShop": {
+        "enabled": true,
+        "rows": 5, // 1-6 rows
+        "title": "§bTeam Upgrades",
+        "filler": "gray", // stained glass color name or "none"
+        "showEditButton": true, // adds a Customize button in the bottom-right corner
+        "showUnmapped": true // autoplaces dream mode upgrades / new upgrades, etc.
     }
 }
 ```

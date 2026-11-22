@@ -120,6 +120,7 @@ export interface ChestSpec {
     onClose?: CloseHandler;
     type?: string; // "minecraft:chest" unless you want a hopper or a dispenser
     size?: number; // container slots, overrides rows for non-chest types
+    keepServerWindow?: boolean; // leave hypixels open window alive upstream (for proxying/rearranging it)
 }
 
 export interface Chest {
@@ -149,6 +150,7 @@ export interface ServerWindow {
     readonly rows: number;
     readonly title: string;
     readonly plain: string;
+    readonly suppressed: boolean;
     items(): Array<ItemInfo | undefined>;
     item(slot: number): ItemInfo | undefined;
     all(): Array<ItemInfo | undefined>;
@@ -157,6 +159,7 @@ export interface ServerWindow {
     setItem(slot: number, item: ItemSpec | Slot | null): void;// override hypixels content
     click(slot: number, options?: { button?: number; mode?: number }): boolean; // send click upstream
     close(): boolean; // close upstream
+    suppress(): void; // withhold hypixels packets for this window so a client-side chest can stand in for it
 }
 
 export type ItemMatcher = string | RegExp | ((item: ItemInfo | undefined, slot: number) => boolean);
@@ -178,6 +181,7 @@ export interface WindowRewrite {
 }
 
 export type ServerWindowListener = (window: ServerWindow) => void;
+export type ServerCloseListener = (windowId: number) => void;
 
 function clampRows(rows: number | undefined): number {
     return Math.max(1, Math.min(MAX_CHEST_ROWS, Math.floor(rows ?? MAX_CHEST_ROWS)));
@@ -639,6 +643,14 @@ class ServerWindowView implements ServerWindow {
         return stripColorCodes(this.title);
     }
 
+    get suppressed(): boolean {
+        return this.api.isSuppressed(this.info.id);
+    }
+
+    suppress(): void {
+        this.api.suppressServer(this.info.id);
+    }
+
     items(): Array<ItemInfo | undefined> {
         return this.info.slots.slice(0, this.info.size).map((slot) => readItem(slot));
     }
@@ -687,6 +699,7 @@ class ServerWindowView implements ServerWindow {
         const send = this.api.host.sendServerPacket;
         if (!send) return false;
         send("close_window", { windowId: this.info.id });
+        this.api.forgetServer(this.info.id);
         return true;
     }
 }
@@ -694,7 +707,7 @@ class ServerWindowView implements ServerWindow {
 // api interface
 export interface WindowApi {
     handleServerPacket(name: string, data: any): boolean;
-    withholdsServerPacket(name: string): boolean; // iinbound packet that cant reach the client as it would close our window
+    withholdsServerPacket(name: string): boolean; // inbound packet that cant reach the client (ie. suppressed window or close_window over ours)
     handleClientPacket(name: string, data: any): boolean;
     dispose(): void;
 
@@ -706,6 +719,7 @@ export interface WindowApi {
     server(): ServerWindow | undefined;
     rewrite(rule: WindowRewrite): () => void;
     onServerWindow(listener: ServerWindowListener): () => void;
+    onServerClose(listener: ServerCloseListener): () => void;
 
     readonly injector: WindowInjector;
 }
@@ -715,6 +729,9 @@ class WindowApiImpl implements WindowApi {
     private chests = new Map<number, OwnChest>();
     private rules: WindowRewrite[] = [];
     private listeners = new Set<ServerWindowListener>();
+    private closeListeners = new Set<ServerCloseListener>();
+    private suppressed = new Set<number>();
+    private lastWithheld = false;
     private action = 1;
     private pendingRewrite = new Set<number>();
 
@@ -738,21 +755,46 @@ class WindowApiImpl implements WindowApi {
         this.chests.delete(id);
     }
 
+    suppressServer(id: number): void {
+        this.suppressed.add(id);
+    }
+
+    isSuppressed(id: number): boolean {
+        return this.suppressed.has(id);
+    }
+
+    forgetServer(id: number): void {
+        this.suppressed.delete(id);
+        this.injector.forgetServer(id);
+    }
+
     // cleanup mostly
 
     handleServerPacket(name: string, data: any): boolean {
+        this.lastWithheld = false;
         try {
             switch (name) {
                 case "open_window":
-                    // replace ours if hypixel sends anything
-                    this.displace();
                     this.injector.applyServerOpen(data);
-                    this.queueRewrite(data.windowId);
                     this.announce(data.windowId);
+                    if (this.suppressed.has(data.windowId)) {
+                        this.lastWithheld = true;
+                        return true;
+                    }
+                    // replace ours if hypixel sends a normal window
+                    this.displace();
+                    this.queueRewrite(data.windowId);
                     return true;
                 case "window_items":
                     this.injector.applyServerItems(data);
                     if (data.windowId !== PLAYER_WINDOW) {
+                        if (this.suppressed.has(data.windowId)) {
+                            this.lastWithheld = true;
+                            this.injector.syncPlayerFromServer(data.windowId);
+                            this.announce(data.windowId);
+                            for (const chest of this.chests.values()) chest.refresh();
+                            return true;
+                        }
                         this.queueRewrite(data.windowId);
                         this.announce(data.windowId);
                     } else {
@@ -761,13 +803,52 @@ class WindowApiImpl implements WindowApi {
                     return true;
                 case "set_slot":
                     this.injector.applyServerSetSlot(data);
-                    if (data.windowId !== PLAYER_WINDOW) this.queueRewrite(data.windowId);
+                    if (data.windowId !== PLAYER_WINDOW) {
+                        if (this.suppressed.has(data.windowId)) {
+                            this.lastWithheld = true;
+                            const serverWin = this.injector.serverWindow(data.windowId);
+                            if (serverWin && data.slot >= serverWin.size) {
+                                this.injector.syncPlayerFromServer(data.windowId, data.slot);
+                            } else if (data.slot >= 0) {
+                                this.announce(data.windowId);
+                            }
+                            return true;
+                        }
+                        this.queueRewrite(data.windowId);
+                        if (data.slot >= 0) this.announce(data.windowId);
+                    }
                     return true;
-                case "close_window":
-                    this.injector.applyServerClose(data.windowId);
+                case "transaction":
+                    if (this.suppressed.has(Number(data.windowId))) {
+                        this.lastWithheld = true;
+                        if (!data.accepted) {
+                            this.host.sendServerPacket?.("transaction", {
+                                windowId: data.windowId,
+                                action: data.action,
+                                accepted: true,
+                            });
+                        }
+                        return true;
+                    }
+                    return false;
+                case "window_property":
+                    if (this.suppressed.has(Number(data.windowId))) {
+                        this.lastWithheld = true;
+                        return true;
+                    }
+                    return false;
+                case "close_window": {
+                    const id = Number(data.windowId);
+                    const wasSuppressed = this.suppressed.delete(id);
+                    this.injector.applyServerClose(id);
+                    if (wasSuppressed) this.lastWithheld = true;
+                    this.announceClose(id);
                     return true;
+                }
                 case "login":
                     this.closeAll();
+                    this.suppressed.clear();
+                    this.injector.clearServer();
                     return true;
                 default:
                     return false;
@@ -779,7 +860,7 @@ class WindowApiImpl implements WindowApi {
     }
 
     withholdsServerPacket(name: string): boolean {
-        return name === "close_window" && this.current() !== undefined;
+        return this.lastWithheld || (name === "close_window" && this.current() !== undefined);
     }
 
     // true means it was for a window of ours and must not get sent to hypixel
@@ -821,13 +902,16 @@ class WindowApiImpl implements WindowApi {
         this.closeAll();
         this.rules = [];
         this.listeners.clear();
+        this.closeListeners.clear();
+        this.suppressed.clear();
     }
 
     // our chests
     chest(spec: ChestSpec): Chest {
+        this.displace();
         const id = this.injector.allocate();
         if (id === undefined) throw new Error("no free window id, close a window of yours first");
-        if (this.options.closeServerWindows !== false) this.closeServerWindows();
+        if (this.options.closeServerWindows !== false && !spec.keepServerWindow) this.closeServerWindows();
         const chest = new OwnChest(this, this.injector, id, spec);
         this.chests.set(id, chest);
         return chest;
@@ -861,6 +945,7 @@ class WindowApiImpl implements WindowApi {
         for (const id of this.injector.openServerIds()) {
             if (id === PLAYER_WINDOW) continue;
             send("close_window", { windowId: id });
+            this.suppressed.delete(id);
             this.injector.forgetServer(id);
         }
     }
@@ -885,6 +970,22 @@ class WindowApiImpl implements WindowApi {
     onServerWindow(listener: ServerWindowListener): () => void {
         this.listeners.add(listener);
         return () => this.listeners.delete(listener);
+    }
+
+    onServerClose(listener: ServerCloseListener): () => void {
+        this.closeListeners.add(listener);
+        return () => this.closeListeners.delete(listener);
+    }
+
+    private announceClose(id: number): void {
+        if (!this.closeListeners.size) return;
+        for (const listener of this.closeListeners) {
+            try {
+                listener(id);
+            } catch (error) {
+                this.fail(error);
+            }
+        }
     }
 
     private view(id: number): ServerWindowView | undefined {

@@ -53,6 +53,8 @@ export interface ItemInfo {
 
 // STATIC DATA FOR COMMON INFO
 // useful items to put into a chest or gui
+// THIS IS STILL MISSING SOME STUFF, but i added what i needed for now basically so idk
+// might need to add it later, someone will say so
 export const ITEM_IDS: Record<string, number> = {
     air: 0,
     stone: 1,
@@ -84,6 +86,7 @@ export const ITEM_IDS: Record<string, number> = {
     furnace: 61,
     ladder: 65,
     lever: 69,
+    redstone_torch: 76,
     ice: 79,
     snow_block: 80,
     clay: 82,
@@ -101,13 +104,15 @@ export const ITEM_IDS: Record<string, number> = {
     nether_brick: 112,
     enchanting_table: 116,
     end_stone: 121,
+    dragon_egg: 122,
     redstone_lamp: 123,
+    ender_chest: 130,
+    tripwire_hook: 131,
     emerald_block: 133,
     command_block: 137,
     beacon: 138,
     anvil: 145,
     trapped_chest: 146,
-    ender_chest: 130,
     daylight_detector: 151,
     redstone_block: 152,
     hopper: 154,
@@ -121,6 +126,7 @@ export const ITEM_IDS: Record<string, number> = {
     carpet: 171,
     coal_block: 173,
     packed_ice: 174,
+    iron_pickaxe: 257,
     flint_and_steel: 259,
     apple: 260,
     bow: 261,
@@ -132,10 +138,22 @@ export const ITEM_IDS: Record<string, number> = {
     iron_sword: 267,
     diamond_sword: 276,
     diamond_pickaxe: 278,
+    golden_pickaxe: 285,
     string: 287,
     feather: 288,
     gunpowder: 289,
     bread: 297,
+    leather_boots: 301,
+    chainmail_boots: 305,
+    iron_helmet: 306,
+    iron_chestplate: 307,
+    iron_leggings: 308,
+    iron_boots: 309,
+    diamond_helmet: 310,
+    diamond_chestplate: 311,
+    diamond_leggings: 312,
+    diamond_boots: 313,
+    golden_boots: 317,
     flint: 318,
     painting: 321,
     golden_apple: 322,
@@ -443,6 +461,30 @@ export class WindowInjector {
     // we told hypixel to close one of theirs, so stop mirroring it
     forgetServer(windowId: number): void {
         this.server.delete(windowId);
+    }
+
+    // clear all mirrored server windows (e.g. server switch / login)
+    clearServer(): void {
+        this.server.clear();
+    }
+
+    // mirror player inventory updates that arrived inside a suppressed server container
+    syncPlayerFromServer(windowId: number, slot?: number): void {
+        const window = this.server.get(windowId);
+        if (!window) return;
+        if (slot !== undefined) {
+            const offset = slot - window.size;
+            if (offset < 0 || offset >= PLAYER_SLOTS) return;
+            const playerSlot = PLAYER_INVENTORY_FIRST + offset;
+            const item = window.slots[slot] ?? { ...EMPTY };
+            this.player[playerSlot] = item;
+            this.send("set_slot", { windowId: PLAYER_WINDOW, slot: playerSlot, item });
+            return;
+        }
+        if (window.slots.length < window.size + PLAYER_SLOTS) return;
+        for (let i = 0; i < PLAYER_SLOTS; i++) {
+            this.player[PLAYER_INVENTORY_FIRST + i] = window.slots[window.size + i] ?? { ...EMPTY };
+        }
     }
 
     // hypixel opening something of its own puts its screen over ours
