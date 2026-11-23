@@ -234,6 +234,10 @@ Also helps with a mythical fish boss bar
 Prevents you from being afk-kicked in lobbies
 
 Can be toggled with `//afk on` & `//afk off`
+
+> **Note:** By default, the antiAfk works by sending yourself a DM. For this to work, your Private Message Privacy on Hypixel must be set to Low. Change this in /settings > Social Settings > Private Message Privacy
+
+> **Note:** It is recommended to set a "targetUser" instead of leaving it as null, as this will make it dm another user and avoid the earlier issue, as well as avoiding catching /r to yourself at times. Use any bot account or guild bridge you can dm for this.
 ```json
 "antiAfk": {
     "enabled": false, // NOTE - by default this is the only plugin thats deactivated
